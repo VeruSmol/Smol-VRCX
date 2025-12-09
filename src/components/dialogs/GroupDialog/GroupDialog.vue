@@ -372,11 +372,19 @@
                             loading="lazy" />
                     </div>
                     <div class="x-friend-list" style="max-height: none">
-                        <span
-                            v-if="groupDialog.instances.length"
-                            style="font-size: 12px; font-weight: bold; margin: 5px">
-                            {{ t('dialog.group.info.instances') }}
-                        </span>
+                        <div style="display: flex; align-items: center; margin: 5px">
+                            <span style="font-size: 12px; font-weight: bold; margin-right: 5px">
+                                {{ t('dialog.group.info.instances') }}
+                            </span>
+                            <el-tooltip :placement="'top'" content="Watch for new instances and auto-open in VRChat">
+                                <el-button
+                                    :type="watchNewInstances ? 'primary' : 'default'"
+                                    size="small"
+                                    @click="watchNewInstances = !watchNewInstances">
+                                    {{ watchNewInstances ? 'Stop watching' : 'Watch for instances' }}
+                                </el-button>
+                            </el-tooltip>
+                        </div>
                         <div v-for="room in groupDialog.instances" :key="room.tag" style="width: 100%">
                             <div style="margin: 5px 0">
                                 <Location :location="room.tag" style="display: inline-block" />
@@ -1206,7 +1214,7 @@
         userImage,
         userStatusClass
     } from '../../../shared/utils';
-    import { useGalleryStore, useGroupStore, useLocationStore, useUserStore } from '../../../stores';
+    import { useGalleryStore, useGroupStore, useLaunchStore, useLocationStore, useUserStore } from '../../../stores';
     import { groupDialogFilterOptions, groupDialogSortingOptions } from '../../../shared/constants';
     import { getNextDialogIndex } from '../../../shared/utils/base/ui';
     import { groupRequest } from '../../../api';
@@ -1220,6 +1228,7 @@
     const { t } = useI18n();
 
     const { showUserDialog } = useUserStore();
+    const launchStore = useLaunchStore();
     const { currentUser } = storeToRefs(useUserStore());
     const { groupDialog, inviteGroupDialog } = storeToRefs(useGroupStore());
     const {
@@ -1259,6 +1268,12 @@
         postId: '',
         groupId: ''
     });
+
+    const watchNewInstances = ref(false);
+    // last location auto-opened, to avoid repeating on the same instance
+    const lastWatchedLocation = ref(null);
+    // current polling timer id (via workerTimers)
+    const instancePollTimerId = ref(null);
 
     const previousInstancesGroupDialog = ref({
         visible: false,
@@ -1315,6 +1330,98 @@
             }
         }
     );
+
+    // Auto-open the first instance when the list goes from 0 -> 1
+    watch(
+        () => groupDialog.value.instances.map((room) => room.tag),
+        (newTags, oldTags) => {
+            if (!watchNewInstances.value) return;
+            if (!groupDialog.value.visible) return;
+
+            const hadInstances = oldTags.length > 0;
+            const hasInstances = newTags.length > 0;
+
+            if (!hadInstances && hasInstances) {
+                const firstRoom = groupDialog.value.instances[0];
+                if (!firstRoom) return;
+
+                const location = firstRoom.tag;
+                const shortName = firstRoom.ref?.shortName || '';
+
+                if (!location || location === lastWatchedLocation.value) return;
+
+                launchStore.tryOpenInstanceInVrc(location, shortName);
+                lastWatchedLocation.value = location;
+
+                // stop polling once we have an instance and have auto-joined
+                stopInstancePolling();
+            }
+        }
+    );
+
+    // Reset when dialog closes / re-open behavior
+    watch(
+        () => groupDialog.value.visible,
+        (visible) => {
+            if (!visible) {
+                watchNewInstances.value = false;
+                lastWatchedLocation.value = null;
+                stopInstancePolling();
+            } else if (watchNewInstances.value) {
+                // dialog opened while toggle on -> resume/start polling if needed
+                startInstancePolling();
+            }
+        }
+    );
+
+    // Start/stop polling when the "Watch for instances" toggle changes
+    watch(watchNewInstances, (enabled) => {
+        if (enabled) {
+            startInstancePolling();
+        } else {
+            stopInstancePolling();
+        }
+    });
+
+    function stopInstancePolling() {
+        if (instancePollTimerId.value !== null) {
+            workerTimers.clearInterval(instancePollTimerId.value);
+            instancePollTimerId.value = null;
+        }
+    }
+
+    function startInstancePolling() {
+        // always clear existing timer first
+        stopInstancePolling();
+
+        if (!groupDialog.value.visible) return;
+        if (!watchNewInstances.value) return;
+        // if there are already instances, no need to poll
+        if (groupDialog.value.instances.length > 0) return;
+
+        const groupId = groupDialog.value.id;
+        if (!groupId) return;
+
+        // poll every 3 seconds for updated group info / instances
+        instancePollTimerId.value = workerTimers.setInterval(async () => {
+            if (!groupDialog.value.visible || !watchNewInstances.value) {
+                stopInstancePolling();
+                return;
+            }
+
+            // an instance appeared while we were waiting
+            if (groupDialog.value.instances.length > 0) {
+                stopInstancePolling();
+                return;
+            }
+
+            try {
+                await getGroupDialogGroup(groupId);
+            } catch (err) {
+                console.error('[GroupDialog] instance polling getGroupDialogGroup failed', err);
+            }
+        }, 3000);
+    }
 
     function showInviteGroupDialog(groupId, userId) {
         if (groupId) {
@@ -1571,7 +1678,6 @@
                         ...groupDialog.value,
                         inGroup: args.json.membershipStatus === 'member'
                     });
-                    // groupDialog.value.inGroup = json.membershipStatus === 'member';
                     getGroupDialogGroup(id);
                 }
                 if (args.json.membershipStatus === 'member') {
