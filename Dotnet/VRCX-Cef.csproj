@@ -19,7 +19,7 @@
     <Title>VRCX</Title>
     <Description>VRCX</Description>
     <PackageIcon>..\images\VRCX.png</PackageIcon>
-    <RepositoryUrl>https://github.com/vrcx-team/VRCX</RepositoryUrl>
+    <RepositoryUrl>https://github.com/VeruSmol/VRCX-SmolLinkFix</RepositoryUrl>
     <ResourceLanguages>en</ResourceLanguages>
     <SatelliteResourceLanguages>en-US;en</SatelliteResourceLanguages>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>

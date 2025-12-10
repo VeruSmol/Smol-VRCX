@@ -309,6 +309,7 @@
     const vrcxUpdaterStore = useVRCXUpdaterStore();
     const favoriteStore = useFavoriteStore();
 
+    // @ts-ignore
     const { saveOpenVROption } = useVrStore();
 
     const {
