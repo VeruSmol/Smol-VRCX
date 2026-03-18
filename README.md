@@ -30,9 +30,10 @@ When viewing a Group's page, you can select the option to automatically open the
 - Enjoy! 
 
 **Existing users:** 
-- Disable "Open at login" for your current VRCX installation.
+- Disable both of these settings in your current VRCX. <img width="438" height="89" alt="image" src="https://github.com/user-attachments/assets/87669794-b2ba-4f8c-979b-e300b46d0d99" />
+
 - Download the zip in the latest release and run the VRCX.exe that is included in the root folder.
-- Re-enable "Open at login" in the latest version.
+- Re-enable the above settings in the updated version.
 - Enjoy!
 
 **Build-it-myself users:** 
