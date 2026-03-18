@@ -489,6 +489,42 @@ export const useGroupStore = defineStore('Group', () => {
             });
     }
 
+    // smol was here :3 (this is a copy of the portion of the function above that actually calls the API request)
+    function refreshGroupDialogInstances(groupId) {
+        return groupRequest
+            .getGroupInstances({
+                groupId
+            })
+            .then((args) => {
+                console.log(
+                    '[Smol] VRC API reported - ',
+                    args?.json?.instances?.length ?? 0,
+                    'instances'
+                );
+
+                if (groupDialog.value.id === args.params.groupId) {
+                    instanceStore.applyGroupDialogInstances(
+                        args.json.instances
+                    );
+                }
+                for (const json of args.json.instances) {
+                    instanceStore.applyInstance(json);
+                    worldRequest
+                        .getCachedWorld({
+                            worldId: json.world.id
+                        })
+                        .then((args1) => {
+                            json.world = args1.ref;
+                        });
+                    instanceRequest.getInstance({
+                        worldId: json.worldId,
+                        instanceId: json.instanceId
+                    });
+                }
+                return args;
+            });
+    }
+
     function applyGroupEvent(event) {
         return {
             userInterest: {
@@ -1119,6 +1155,7 @@ export const useGroupStore = defineStore('Group', () => {
         saveCurrentUserGroups,
         applyPresenceGroups,
         getGroupDialogGroup,
+        refreshGroupDialogInstances,
         updateInGameGroupOrder,
         sortGroupInstancesByInGame,
         leaveGroup,

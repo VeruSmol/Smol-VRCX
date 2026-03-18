@@ -372,18 +372,55 @@
                             loading="lazy" />
                     </div>
                     <div class="x-friend-list" style="max-height: none">
-                        <div style="display: flex; align-items: center; margin: 5px">
+                        <div style="display: flex; align-items: center; margin: 5px; gap: 8px">
                             <span style="font-size: 12px; font-weight: bold; margin-right: 5px">
                                 {{ t('dialog.group.info.instances') }}
                             </span>
-                            <el-tooltip :placement="'top'" content="Watch for new instances and auto-open in VRChat">
+
+                            <el-tooltip
+                                :placement="'top'"
+                                :content="
+                                    watchNewInstances
+                                        ? groupDialog.inGroup
+                                            ? 'New instances will be opened in VRChat'
+                                            : 'Group Public instances will be opened in VRChat. Join the group to see other types.'
+                                        : groupDialog.inGroup
+                                          ? 'Watch for new instances and open them in VRChat'
+                                          : 'Non-members can only see Group Public instances'
+                                ">
                                 <el-button
                                     :type="watchNewInstances ? 'primary' : 'default'"
                                     size="small"
                                     @click="watchNewInstances = !watchNewInstances">
-                                    {{ watchNewInstances ? 'Stop watching' : 'Watch for instances' }}
+                                    {{
+                                        watchNewInstances
+                                            ? groupDialog.inGroup
+                                                ? 'Opening New Instances'
+                                                : 'Opening New Public Instances'
+                                            : groupDialog.inGroup
+                                              ? 'Open New Instances'
+                                              : 'Open New Public Instances'
+                                    }}
                                 </el-button>
                             </el-tooltip>
+
+                            <div style="display: flex; align-items: center; gap: 6px">
+                                <span style="font-size: 12px">Checking every</span>
+                                <el-input-number
+                                    ref="instancePollInputRef"
+                                    v-model="instancePollSeconds"
+                                    :min="1"
+                                    :max="9999"
+                                    :step="1"
+                                    :precision="0"
+                                    size="small"
+                                    controls-position="right"
+                                    style="width: 80px"
+                                    @input="limitInstancePollInputLength" />
+                                <span style="font-size: 12px">
+                                    {{ getInstancePollSecondsLabel(instancePollSeconds) }}
+                                </span>
+                            </div>
                         </div>
                         <div v-for="room in groupDialog.instances" :key="room.tag" style="width: 100%">
                             <div style="margin: 5px 0">
@@ -1233,6 +1270,7 @@
     const { groupDialog, inviteGroupDialog } = storeToRefs(useGroupStore());
     const {
         getGroupDialogGroup,
+        refreshGroupDialogInstances,
         updateGroupPostSearch,
         showGroupDialog,
         leaveGroupPrompt,
@@ -1274,7 +1312,10 @@
     const lastWatchedLocation = ref(null);
     // current polling timer id (via workerTimers)
     const instancePollTimerId = ref(null);
-
+    const instancePollInputRef = ref(null);
+    const instancePollSeconds = ref(
+        Math.max(1, Math.min(60, Math.round(Number(localStorage.getItem('smol-instance-poll-seconds')) || 15)))
+    );
     const previousInstancesGroupDialog = ref({
         visible: false,
         openFlg: false,
@@ -1330,32 +1371,71 @@
             }
         }
     );
+    // smol here, this is where the instance watcher actually does its thing, the above is vanilla
 
-    // Auto-open the first instance when the list goes from 0 -> 1
+    function limitInstancePollInputLength() {
+        nextTick(() => {
+            const input = instancePollInputRef.value?.$el?.querySelector('input');
+
+            if (!input) return;
+
+            input.value = input.value.replace(/\D/g, '').slice(0, 4);
+        });
+    }
+
+    function getInstancePollSecondsLabel(value) {
+        const seconds = Math.round(Number(value) || 0);
+        // teehee :3c
+        if (seconds === 1) return 'second. (WARNING! API abuse can lead to a ban)';
+        if (seconds < 5 && seconds !== 1) return 'seconds. (caution, you may get rate-limited)';
+        if (seconds === 67) return 'seconds. (HAHA FUNNY SO 67!! 67!!!!!)';
+        if (seconds === 69) return 'seconds. (nice)';
+        if (seconds === 420) return 'seconds. (blaze it or sumthin)';
+        if (seconds === 666) return 'seconds. (OUUU)';
+        if (seconds === 1337) return 'seconds. (do YOU hack?)';
+        if (seconds === 6767) return 'seconds. (of course)';
+        if (seconds === 6969) return 'seconds. (even NICER)';
+        if (seconds === 9999) return 'seconds. (idk why youd set it to this but ok)';
+
+        return 'seconds.';
+    }
+
+    watch(instancePollSeconds, (value) => {
+        const normalized = Math.max(1, Math.min(9999, Math.round(Number(value) || 15)));
+
+        if (normalized !== value) {
+            instancePollSeconds.value = normalized;
+            return;
+        }
+
+        localStorage.setItem('smol-instance-poll-seconds', String(normalized));
+
+        if (watchNewInstances.value && groupDialog.value.visible) {
+            startInstancePolling();
+        }
+    });
+
     watch(
         () => groupDialog.value.instances.map((room) => room.tag),
         (newTags, oldTags) => {
             if (!watchNewInstances.value) return;
             if (!groupDialog.value.visible) return;
 
-            const hadInstances = oldTags.length > 0;
-            const hasInstances = newTags.length > 0;
+            const addedTags = newTags.filter((tag) => !oldTags.includes(tag));
+            if (addedTags.length === 0) return;
 
-            if (!hadInstances && hasInstances) {
-                const firstRoom = groupDialog.value.instances[0];
-                if (!firstRoom) return;
+            const newLocation = addedTags[0]; //this will probably cause issues if two instances open between polls, oh well!
+            if (!newLocation || newLocation === lastWatchedLocation.value) return;
 
-                const location = firstRoom.tag;
-                const shortName = firstRoom.ref?.shortName || '';
+            const newRoom = groupDialog.value.instances.find((room) => room.tag === newLocation);
+            if (!newRoom) return;
 
-                if (!location || location === lastWatchedLocation.value) return;
+            const shortName = newRoom.ref?.shortName || '';
 
-                launchStore.tryOpenInstanceInVrc(location, shortName);
-                lastWatchedLocation.value = location;
+            launchStore.tryOpenInstanceInVrc(newLocation, shortName);
+            lastWatchedLocation.value = newLocation;
 
-                // stop polling once we have an instance and have auto-joined
-                stopInstancePolling();
-            }
+            console.log('[Smol] New instance detected and opened -', newLocation);
         }
     );
 
@@ -1366,7 +1446,7 @@
             if (!visible) {
                 watchNewInstances.value = false;
                 lastWatchedLocation.value = null;
-                stopInstancePolling();
+                stopInstancePolling('Group Dialog closed');
             } else if (watchNewInstances.value) {
                 // dialog opened while toggle on -> resume/start polling if needed
                 startInstancePolling();
@@ -1379,48 +1459,43 @@
         if (enabled) {
             startInstancePolling();
         } else {
-            stopInstancePolling();
+            stopInstancePolling('Watch For Instances toggle disabled');
         }
     });
 
-    function stopInstancePolling() {
-        if (instancePollTimerId.value !== null) {
+    function stopInstancePolling(reason = '') {
+        if (instancePollTimerId.value) {
             workerTimers.clearInterval(instancePollTimerId.value);
             instancePollTimerId.value = null;
+            console.log('[Smol] Watch for instances OFF for Group ID -', groupDialog.value.id, 'Reason -', reason);
         }
     }
 
     function startInstancePolling() {
-        // always clear existing timer first
-        stopInstancePolling();
+        stopInstancePolling('Start Watching requested - cleared current poll timer just in case');
 
         if (!groupDialog.value.visible) return;
         if (!watchNewInstances.value) return;
-        // if there are already instances, no need to poll
-        if (groupDialog.value.instances.length > 0) return;
+
+        console.log('[Smol] Watch for instances ON. Group ID -', groupDialog.value.id);
 
         const groupId = groupDialog.value.id;
         if (!groupId) return;
 
-        // poll every 3 seconds for updated group info / instances
         instancePollTimerId.value = workerTimers.setInterval(async () => {
             if (!groupDialog.value.visible || !watchNewInstances.value) {
-                stopInstancePolling();
-                return;
-            }
-
-            // an instance appeared while we were waiting
-            if (groupDialog.value.instances.length > 0) {
-                stopInstancePolling();
+                stopInstancePolling('Group Dialog hidden or toggle disabled during poll');
                 return;
             }
 
             try {
-                await getGroupDialogGroup(groupId);
+                console.log('[Smol] Instance refresh requested');
+                const result = await refreshGroupDialogInstances(groupId);
+                console.log('[Smol] Instance refresh success -', result?.json?.instances?.length ?? result);
             } catch (err) {
-                console.error('[GroupDialog] instance polling getGroupDialogGroup failed', err);
+                console.error('[Smol] Instance refresh failed -', err);
             }
-        }, 3000);
+        }, instancePollSeconds.value * 1000);
     }
 
     function showInviteGroupDialog(groupId, userId) {
