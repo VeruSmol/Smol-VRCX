@@ -1,3 +1,47 @@
+# VRCX, but with bonus!
+## The aforementioned bonus:
+- **Easier access to newly created Group Instances**
+- **Easier debugging of VRCDN streams**
+- Built with the [VRChat API Guidelines](https://github.com/VRChatAPI/vrchatapi.github.io) in mind <3
+
+### **Hello all! This is my smol fork of VRCX. I'm still learning a lot about development, but here's the main features I use!**
+
+## Automatically open newly created Group instances in VRChat
+<img width="482" height="86" alt="image" src="https://github.com/user-attachments/assets/b8967df9-dfab-419a-99df-74ebaa43b414" />
+
+- Checks if you are a member of the group and updates the tooltips accordingly.
+- Warnings built in and extreme settings are not allowed to prevent API abuse.
+- New Instances open in the Instance page of the VRChat big menu.
+- Uses existing external URL API.
+
+When viewing a Group's page, you can select the option to automatically open the instance in VRChat (via external URL). You can determine the rate at which you want to check for instances as well! Automatically turns off if you leave the page, saves whatever number it was last set to, and has polite defaults. 
+
+
+## Automatically parse VRCDN Preview links from player links
+- Supports RTMP, RTSPT, and HTTPS VRCDN player links.
+- Clicking **Open** on a video play link in the Game Log will open the preview in your default browser.
+- Helpful for quickly checking the link in the world is live!
+
+
+# How to install
+**New Users:** 
+- Download the zip in the latest release.
+- Run the VRCX.exe that is included in the root folder.
+- Enjoy! 
+
+**Existing users:** 
+- Disable "Open at login" for your current VRCX installation.
+- Download the zip in the latest release and run the VRCX.exe that is included in the root folder.
+- Re-enable "Open at login" in the latest version.
+- Enjoy!
+
+**Build-it-myself users:** 
+- Requires **.net9** _(sorry)_
+- Otherwise follow all VRCX guidelines to build.
+
+# What is VRCX? 
+
+
 <div align="center">
 
 # <img src="https://raw.githubusercontent.com/vrcx-team/VRCX/master/images/VRCX.ico" width="64" height="64"> </img> VRCX
