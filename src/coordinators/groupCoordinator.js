@@ -68,6 +68,11 @@ let smolAutoOpenDurationSeconds = Math.max(
 let smolAutoOpenRemainingSeconds = 0;
 let smolAutoOpenCountdownTimerId = null;
 
+// [smol] - use tag when available, otherwise fall back to location
+function getSmolRoomLocation(room) {
+  return room?.tag || room?.location || "";
+}
+
 export function getSmolWatchNewInstances() {
   return smolWatchNewInstances;
 }
@@ -156,7 +161,7 @@ export function getSmolInstancePollSecondsLabel(value) {
 // [smol] - seed current instances as baseline so existing instances are not treated as newly opened
 export function seedSmolObservedInstances(instances) {
   smolLastWatchedTags = Array.isArray(instances)
-    ? instances.map((room) => room?.tag).filter(Boolean)
+    ? instances.map((room) => getSmolRoomLocation(room)).filter(Boolean)
     : [];
 }
 
@@ -317,20 +322,34 @@ export function startSmolInstancePolling(groupId, existingRef) {
 }
 
 // [smol] - detect new instances and open the newest one in VRChat
-// [smol] - this one's the beans
 export function handleSmolObservedInstances(instances) {
   const groupStore = useGroupStore();
   const launchStore = useLaunchStore();
 
   const safeInstances = Array.isArray(instances) ? instances : [];
-  const currentTags = safeInstances.map((room) => room?.tag).filter(Boolean);
+  const currentTags = safeInstances
+    .map((room) => getSmolRoomLocation(room))
+    .filter(Boolean);
 
   const addedTags = currentTags.filter(
     (tag) => !smolLastWatchedTags.includes(tag),
   );
 
+  console.log("[Smol][AUTO] currentTags:", currentTags);
+  console.log("[Smol][AUTO] lastWatchedTags:", smolLastWatchedTags);
+  console.log("[Smol][AUTO] addedTags:", addedTags);
+  console.log("[Smol][AUTO] lastWatchedLocation:", smolLastWatchedLocation);
+  console.log("[Smol][AUTO] smolWatchNewInstances:", smolWatchNewInstances);
+  console.log("[Smol][AUTO] watchedGroupId:", smolWatchedGroupId);
+  console.log(
+    "[Smol][AUTO] dialog visible/id:",
+    groupStore.groupDialog.visible,
+    groupStore.groupDialog.id,
+  );
+
   // [smol] - keep baseline updated even when watcher is off
   if (!smolWatchNewInstances) {
+    console.log("[Smol][AUTO] abort: watcher disabled");
     smolLastWatchedTags = [...currentTags];
     return addedTags;
   }
@@ -342,33 +361,61 @@ export function handleSmolObservedInstances(instances) {
     smolWatchedGroupId &&
     groupStore.groupDialog.id !== smolWatchedGroupId
   ) {
+    console.log("[Smol][AUTO] abort: different group dialog is open");
     smolLastWatchedTags = [...currentTags];
     return addedTags;
   }
 
   if (addedTags.length === 0) {
+    console.log("[Smol][AUTO] abort: no added tags");
     smolLastWatchedTags = [...currentTags];
     return addedTags;
   }
 
-  // [smol] - find the first new instance since the last check
-  const newLocation = addedTags[0];
-  if (!newLocation || newLocation === smolLastWatchedLocation) {
+  const newLocation = [...addedTags]
+    .reverse()
+    .find((tag) => tag && tag !== smolLastWatchedLocation);
+
+  console.log("[Smol][AUTO] chosen newLocation:", newLocation);
+
+  if (!newLocation) {
+    console.log("[Smol][AUTO] abort: no unopened new location");
     smolLastWatchedTags = [...currentTags];
     return addedTags;
   }
 
-  const newRoom = safeInstances.find((room) => room?.tag === newLocation);
+  const newRoom = safeInstances.find(
+    (room) => getSmolRoomLocation(room) === newLocation,
+  );
+  console.log("[Smol][AUTO] matched room:", newRoom);
+
   if (!newRoom) {
+    console.log("[Smol][AUTO] abort: no matching room for tag");
     smolLastWatchedTags = [...currentTags];
     return addedTags;
   }
 
-  const shortName = newRoom?.ref?.shortName || "";
-  launchStore.tryOpenInstanceInVrc(newLocation, shortName);
-  smolLastWatchedLocation = newLocation;
+  const shortName = newRoom?.ref?.shortName || newRoom?.shortName || "";
 
-  console.log("[Smol] New instance detected and opened -", newLocation);
+  console.log("[Smol][AUTO] about to call tryOpenInstanceInVrc:", {
+    newLocation,
+    shortName,
+    fnType: typeof launchStore?.tryOpenInstanceInVrc,
+  });
+
+  try {
+    launchStore.tryOpenInstanceInVrc(newLocation, shortName);
+    smolLastWatchedLocation = newLocation;
+    resetSmolWatcherState("Auto-open succeeded");
+
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+
+    console.log("[Smol][AUTO] launch call completed:", newLocation);
+  } catch (err) {
+    console.error("[Smol][AUTO] launch threw error:", err);
+  }
 
   smolLastWatchedTags = [...currentTags];
   return addedTags;
