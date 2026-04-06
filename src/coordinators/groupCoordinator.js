@@ -316,6 +316,25 @@ export function startSmolInstancePolling(groupId, existingRef) {
 
       handleSmolObservedInstances(args?.json?.instances ?? []);
     } catch (err) {
+      // [smol] - logic to stop if request.js throws a 429 error (tysm)
+      if (err?.status === 429) {
+        console.warn(
+          "[Smol] API returned 429 rate-limit. Stopping watcher",
+          {
+            status: err?.status,
+            endpoint: err?.endpoint,
+            message: err?.message,
+          },
+        );
+
+        // [smol] - Set watcher state to off
+        smolWatchNewInstances = false;
+
+        // [smol] - reason string
+        stopSmolInstancePolling("API Rate-limited.");
+        return;
+      }
+
       console.error("[Smol] Instance refresh failed -", err);
     }
   }, smolInstancePollSeconds * 1000);
