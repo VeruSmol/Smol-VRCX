@@ -20,7 +20,9 @@
         </span>
       </div>
 
-      <div class="flex flex-wrap items-center gap-2 mt-3">
+      <div 
+       v-if="smolShowAutoOpenNewInstancesButton"
+        class="flex flex-wrap items-center gap-2 mt-3">
         <TooltipWrapper side="top" :content="getSmolWatcherTooltip()">
           <Button
             size="sm"
@@ -174,7 +176,7 @@ import { useI18n } from "vue-i18n";
 
 import { userImage, userStatusClass } from "../../../shared/utils";
 import { refreshInstancePlayerCount } from "../../../coordinators/instanceCoordinator";
-import { useGroupStore, useLocationStore } from "../../../stores";
+import { useAdvancedSettingsStore,useGroupStore, useLocationStore } from "../../../stores";
 
 import InstanceActionBar from "../../InstanceActionBar.vue";
 import { showUserDialog } from "../../../coordinators/userCoordinator";
@@ -208,7 +210,9 @@ const smolAutoOpenDurationSeconds = ref(getSmolAutoOpenDurationSeconds());
 const smolAutoOpenRemainingSeconds = ref(getSmolAutoOpenRemainingSeconds());
 const smolAutoOpenDurationMode = ref("1");
 const smolAutoOpenDurationMinutes = ref(1);
-
+const { smolShowAutoOpenNewInstancesButton } = storeToRefs(
+  useAdvancedSettingsStore(),
+);
 // [smol] - state mirrored from coordinator/settings
 const smolKeepWatchingAfterDialogClose = ref(
   getSmolKeepWatchingAfterDialogClose(),

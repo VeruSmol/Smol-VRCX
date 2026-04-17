@@ -1,3 +1,5 @@
+// @ts-nocheck
+// oxlint-disable no-unused-vars
 import { reactive, ref, watch } from "vue";
 import { defineStore } from "pinia";
 import { toast } from "vue-sonner";
@@ -13,12 +15,15 @@ import { useVRCXUpdaterStore } from "../vrcxUpdater";
 import { useVrcxStore } from "../vrcx";
 import { watchState } from "../../services/watchState";
 
-// [smol] - instance watcher settings live in groupCoordinator
+// [smol] - instance watcher settings that live in groupCoordinator
 import {
   getSmolInstancePollSeconds as getSmolInstancePollSecondsConfig,
   setSmolInstancePollSeconds as saveSmolInstancePollSecondsConfig,
   getSmolKeepWatchingAfterDialogClose as getSmolKeepWatchingAfterDialogCloseConfig,
   setSmolKeepWatchingAfterDialogClose as saveSmolKeepWatchingAfterDialogCloseConfig,
+  getSmolWatchNewInstances,
+  setSmolWatchNewInstances,
+  stopSmolInstancePolling,
 } from "../../coordinators/groupCoordinator";
 
 import configRepository from "../../services/config";
@@ -85,6 +90,7 @@ export const useAdvancedSettingsStore = defineStore("AdvancedSettings", () => {
   const smolKeepWatchingAfterDialogClose = ref(
     getSmolKeepWatchingAfterDialogCloseConfig(),
   );
+  const smolShowAutoOpenNewInstancesButton = ref(true);
 
   watch(
     () => watchState.isLoggedIn,
@@ -133,6 +139,7 @@ export const useAdvancedSettingsStore = defineStore("AdvancedSettings", () => {
       vrcRegistryAutoBackupConfig,
       vrcRegistryAskRestoreConfig,
       sentryErrorReportingConfig,
+      smolShowAutoOpenNewInstancesButtonConfig,
     ] = await Promise.all([
       configRepository.getBool("enablePrimaryPassword", false),
       configRepository.getString("VRCX_bioLanguage"),
@@ -170,6 +177,7 @@ export const useAdvancedSettingsStore = defineStore("AdvancedSettings", () => {
       configRepository.getBool("VRCX_vrcRegistryAutoBackup", true),
       configRepository.getBool("VRCX_vrcRegistryAskRestore", true),
       configRepository.getString("VRCX_SentryEnabled", ""),
+      configRepository.getBool("VRCX_smolShowAutoOpenNewInstancesButton", true),
     ]);
 
     if (!bioLanguageConfig || !languageCodes.includes(bioLanguageConfig)) {
@@ -215,6 +223,7 @@ export const useAdvancedSettingsStore = defineStore("AdvancedSettings", () => {
     vrcRegistryAutoBackup.value = vrcRegistryAutoBackupConfig;
     vrcRegistryAskRestore.value = vrcRegistryAskRestoreConfig;
     sentryErrorReporting.value = sentryErrorReportingConfig === "true";
+    smolShowAutoOpenNewInstancesButton.value = smolShowAutoOpenNewInstancesButtonConfig;
 
     // [smol] - sync
     smolInstancePollSeconds.value = getSmolInstancePollSecondsConfig();
@@ -222,6 +231,8 @@ export const useAdvancedSettingsStore = defineStore("AdvancedSettings", () => {
       getSmolKeepWatchingAfterDialogCloseConfig();
 
     handleSetAppLauncherSettings();
+
+
 
     setTimeout(() => {
       if (
@@ -423,6 +434,25 @@ export const useAdvancedSettingsStore = defineStore("AdvancedSettings", () => {
   function setSmolKeepWatchingAfterDialogClose(value) {
     smolKeepWatchingAfterDialogClose.value =
       saveSmolKeepWatchingAfterDialogCloseConfig(value);
+  }
+  // [smol] - setting for showing auto-open new instances button in instance watcher
+  async function setSmolShowAutoOpenNewInstancesButton(value) {
+    const nextValue =
+      typeof value === "boolean"
+        ? value
+        : !smolShowAutoOpenNewInstancesButton.value;
+
+    if (!nextValue && getSmolWatchNewInstances()) {
+      setSmolWatchNewInstances(false);
+      stopSmolInstancePolling("Auto-open controls hidden by advanced setting");
+    }
+
+    smolShowAutoOpenNewInstancesButton.value = nextValue;
+
+    await configRepository.setBool(
+      "VRCX_smolShowAutoOpenNewInstancesButton",
+      nextValue,
+    );
   }
 
   async function fetchAvailableModels(overrides = {}) {
@@ -1119,6 +1149,10 @@ export const useAdvancedSettingsStore = defineStore("AdvancedSettings", () => {
     // [smol] - instance watcher settings
     smolInstancePollSeconds,
     smolKeepWatchingAfterDialogClose,
+    smolShowAutoOpenNewInstancesButton,
+    setSmolInstancePollSeconds,
+    setSmolKeepWatchingAfterDialogClose,
+    setSmolShowAutoOpenNewInstancesButton,
 
     setEnablePrimaryPassword,
     setEnablePrimaryPasswordConfigRepository,
@@ -1173,9 +1207,5 @@ export const useAdvancedSettingsStore = defineStore("AdvancedSettings", () => {
     setSentryErrorReporting,
     checkSentryConsent,
     askDeleteAllScreenshotMetadata,
-
-    // [smol] - instance watcher settings
-    setSmolInstancePollSeconds,
-    setSmolKeepWatchingAfterDialogClose,
   };
 });

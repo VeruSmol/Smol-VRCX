@@ -90,6 +90,23 @@
           @update:modelValue="setSmolKeepWatchingAfterDialogClose"
         />
       </SettingsItem>
+      <SettingsItem
+        :label="
+          t(
+            'view.settings.advanced.advanced.smol_show_auto_open_controls.header',
+          )
+        "
+        :description="
+          t(
+            'view.settings.advanced.advanced.smol_show_auto_open_controls.description',
+          )
+        "
+      >
+        <Switch
+          :model-value="smolShowAutoOpenNewInstancesButton"
+          @update:modelValue="setSmolShowAutoOpenNewInstancesButton"
+        />
+      </SettingsItem>
     </SettingsGroup>
 
     <SettingsGroup :title="t('view.settings.advanced_groups.security.header')">
@@ -768,6 +785,7 @@ const {
   // [smol] - advanced settings
   smolInstancePollSeconds,
   smolKeepWatchingAfterDialogClose,
+  smolShowAutoOpenNewInstancesButton,
 } = storeToRefs(advancedSettingsStore);
 
 const {
@@ -787,6 +805,7 @@ const {
   // [smol] - advanced setters
   setSmolInstancePollSeconds,
   setSmolKeepWatchingAfterDialogClose,
+  setSmolShowAutoOpenNewInstancesButton,
 } = advancedSettingsStore;
 
 const configTreeData = ref({});
