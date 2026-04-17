@@ -1,10 +1,3 @@
-v2.0.1: Small update to force instance watching to stop on 429's from VRChat API. Logs reason code in console.
-**[Updated VRChat API guidelines here](https://vrchat.community/faq)**. 
-In-app notification to clarify behavior will come later. No 429's have been reported, this is a pre-emptive change. We love respecting VRChat guidelines! <3 <3 <3 
-Also, laid the groundwork for auto-updates in the future. Really hoping to get that working soon! 
-Added Linux appimage (experimental)
-Installation/Update instructions are below:
-
 ---
 
 # VRCX, but with bonus!
