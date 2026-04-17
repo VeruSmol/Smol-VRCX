@@ -14,3 +14,7 @@ AGENTS.md
 AI_GUIDE.md
 CLAUDE.md
 coverage/
+Installer/VRCX_Setup.exe
+/VRCX_*_Setup.exe
+*.blockmap
+latest.yml
