@@ -38,6 +38,13 @@
         />
       </SettingsItem>
 
+
+    </SettingsGroup>
+
+    <SettingsGroup
+      :title="t('view.settings.advanced.advanced.vrchat_instance_settings.header')"
+    >
+    
       <SettingsItem
         :label="t('view.settings.advanced.advanced.self_invite.header')"
         :description="
@@ -50,25 +57,22 @@
         />
       </SettingsItem>
 
-      <!-- [smol] - advanced setting for instance watcher poll rate, placed directly under Self Invite -->
+      <!-- [smol] - advanced setting for instance watcher button toggle -->
       <SettingsItem
         :label="
-          t('view.settings.advanced.advanced.smol_instance_poll_rate.header')
+          t(
+            'view.settings.advanced.advanced.smol_show_auto_open_controls.header',
+          )
         "
         :description="
           t(
-            'view.settings.advanced.advanced.smol_instance_poll_rate.description',
+            'view.settings.advanced.advanced.smol_show_auto_open_controls.description',
           )
         "
       >
-        <input
-          v-model.number="smolInstancePollSecondsInput"
-          type="number"
-          min="5"
-          max="300"
-          step="1"
-          class="h-8 w-24 rounded-md border border-input bg-background px-2 text-sm"
-          @change="updateSmolInstancePollSeconds"
+        <Switch
+          :model-value="smolShowAutoOpenNewInstancesButton"
+          @update:modelValue="setSmolShowAutoOpenNewInstancesButton"
         />
       </SettingsItem>
 
@@ -90,24 +94,32 @@
           @update:modelValue="setSmolKeepWatchingAfterDialogClose"
         />
       </SettingsItem>
+
+      <!-- [smol] - advanced setting for instance watcher poll rate-->
       <SettingsItem
         :label="
-          t(
-            'view.settings.advanced.advanced.smol_show_auto_open_controls.header',
-          )
+          t('view.settings.advanced.advanced.smol_instance_poll_rate.header')
         "
         :description="
           t(
-            'view.settings.advanced.advanced.smol_show_auto_open_controls.description',
+            'view.settings.advanced.advanced.smol_instance_poll_rate.description',
           )
         "
       >
-        <Switch
-          :model-value="smolShowAutoOpenNewInstancesButton"
-          @update:modelValue="setSmolShowAutoOpenNewInstancesButton"
+        <input
+          v-model.number="smolInstancePollSecondsInput"
+          type="number"
+          min="5"
+          max="300"
+          step="1"
+          class="h-8 w-24 rounded-md border border-input bg-background px-2 text-sm"
+          @change="updateSmolInstancePollSeconds"
         />
       </SettingsItem>
+
     </SettingsGroup>
+
+
 
     <SettingsGroup :title="t('view.settings.advanced_groups.security.header')">
       <SettingsItem

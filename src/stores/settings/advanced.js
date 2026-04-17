@@ -1153,7 +1153,6 @@ export const useAdvancedSettingsStore = defineStore("AdvancedSettings", () => {
     setSmolInstancePollSeconds,
     setSmolKeepWatchingAfterDialogClose,
     setSmolShowAutoOpenNewInstancesButton,
-
     setEnablePrimaryPassword,
     setEnablePrimaryPasswordConfigRepository,
     setBioLanguage,

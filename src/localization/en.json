@@ -1042,6 +1042,9 @@
                     "vrchat_settings": {
                         "header": "VRChat"
                     },
+                    "vrchat_instance_settings": {
+                        "header": "VRChat Instances"
+                    },
                     "vrcx_settings": {
                         "header": "VRCX"
                     },
@@ -1065,17 +1068,17 @@
                         "header": "Self Invite",
                         "description": "Self Invite Instead of Opening Instance in VRChat"
                     },
-                    "smol_keep_watching_after_close": {
-                        "header": "Keep Watching After Closing Group Dialog",
-                        "description": "Continue polling the selected group even after closing its dialog."
+                    "smol_show_auto_open_controls": {
+                        "header": "Show Auto-Open Instance Controls",
+                        "description": "Show or hide the auto-open controls in the Group Instances tab."                    
                     },
                     "smol_instance_poll_rate": {
                         "header": "Instance Poll Rate (seconds)",
                         "description": "How often VRCX checks for new instances while auto-open is active."
                     },
-                    "smol_show_auto_open_controls": {
-                        "header": "Show Auto-Open Instance Controls",
-                        "description": "Show or hide the auto-open controls in the Group Instances tab."
+                    "smol_keep_watching_after_close": {
+                        "header": "Keep Watching After Closing Group Dialog",
+                        "description": "Continue polling the selected group even after closing its dialog."
                         },
                     "anonymous_error_reporting": {
                         "header": "Anonymous Error Reporting (Nightly Only)",
