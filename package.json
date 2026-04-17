@@ -31,9 +31,9 @@
     "author": "VRCX Team",
     "license": "MIT",
     "bugs": {
-        "url": "https://github.com/vrcx-team/VRCX/issues"
+        "url": "https://github.com/VeruSmol/VRCX-SmolLinkFix/issues"
     },
-    "homepage": "https://github.com/vrcx-team/VRCX#readme",
+    "homepage": "https://github.com/VeruSmol/VRCX-SmolLinkFix#readme",
     "devDependencies": {
         "@dnd-kit/vue": "^0.3.2",
         "@electron/rebuild": "^4.0.3",
@@ -118,8 +118,7 @@
             "images/VRCX_notify.png",
             "images/VRCX_notify.ico",
             "Version",
-            "src-electron/libs/linux/libopenvr_api.so",
-            ".no-updater"
+            "src-electron/libs/linux/libopenvr_api.so"
         ],
         "asarUnpack": [
             "node_modules/node-api-dotnet/**/*",
@@ -197,5 +196,5 @@
         "node": ">=24.10.0",
         "npm": ">=11.5.0"
     },
-    "version": "2026.02.11"
+    "version": "2.0.3"
 }

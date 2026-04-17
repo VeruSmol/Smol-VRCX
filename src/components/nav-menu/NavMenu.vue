@@ -317,7 +317,7 @@
     };
 
     const openGithub = () => {
-        openExternalLink('https://github.com/vrcx-team/VRCX');
+        openExternalLink('https://github.com/VeruSmol/VRCX-SmolLinkFix/');
     };
 
     const handleSupportLink = (id) => {
