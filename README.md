@@ -51,18 +51,11 @@ When viewing a Group's page, you can select the option to automatically open the
 **Requires: Windows 10+** *(macos & linux electron versions maybe at some point)*
 
 **New Users:** 
-- Download the zip in the latest release.
-- Extract the zip file to a folder.
-- Run the VRCX.exe located inside the `Cef` folder.
+- Download the installer included in the latest [release](https://github.com/VeruSmol/VRCX-SmolLinkFix/releases/).
+- Connect your VRChat account. 
 - Enjoy! 
 
 **Existing users:** 
-- Disable both of these settings in your current VRCX. 
-<img width="438" height="89" alt="image" src="https://github.com/user-attachments/assets/87669794-b2ba-4f8c-979b-e300b46d0d99" />
-
-- Download the zip in the latest release.
-- Extract the zip file to a folder.
-- Run the VRCX.exe located inside the `Cef` folder.
-- Re-enable the above settings in the updated version.
+- Download the installer included in the latest [release](https://github.com/VeruSmol/VRCX-SmolLinkFix/releases/).
 - Enjoy!
 
