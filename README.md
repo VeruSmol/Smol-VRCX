@@ -6,7 +6,7 @@
 - **Dedicated Group Info Page**
 - **Dedicated Group Instances Page**
 - **Auto-open newly created Group Instances**
-- Built with the [VRChat API Guidelines](https://github.com/VRChatAPI/vrchatapi.github.io) in mind <3
+- Built with the [VRChat API Guidelines](https://vrchat.community/faq) in mind <3
 
 ### Hello all! This is my smol fork of VRCX. I'm still learning a lot about development, so please give feedback on any jank. I use these features nearly every day, I hope they are useful for you! 
 
