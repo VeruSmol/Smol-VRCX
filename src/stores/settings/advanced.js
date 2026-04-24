@@ -21,6 +21,8 @@ import {
   setSmolInstancePollSeconds as saveSmolInstancePollSecondsConfig,
   getSmolKeepWatchingAfterDialogClose as getSmolKeepWatchingAfterDialogCloseConfig,
   setSmolKeepWatchingAfterDialogClose as saveSmolKeepWatchingAfterDialogCloseConfig,
+  getSmolAddedTagPickOrder as getSmolAddedTagPickOrderConfig,
+  setSmolAddedTagPickOrder as saveSmolAddedTagPickOrderConfig,
   getSmolWatchNewInstances,
   setSmolWatchNewInstances,
   stopSmolInstancePolling,
@@ -86,6 +88,7 @@ export const useAdvancedSettingsStore = defineStore("AdvancedSettings", () => {
   const sentryErrorReporting = ref(false);
 
   // [smol] - advanced settings for instance watcher
+  const smolAddedTagPickOrder = ref(getSmolAddedTagPickOrderConfig());
   const smolInstancePollSeconds = ref(getSmolInstancePollSecondsConfig());
   const smolKeepWatchingAfterDialogClose = ref(
     getSmolKeepWatchingAfterDialogCloseConfig(),
@@ -226,6 +229,7 @@ export const useAdvancedSettingsStore = defineStore("AdvancedSettings", () => {
     smolShowAutoOpenNewInstancesButton.value = smolShowAutoOpenNewInstancesButtonConfig;
 
     // [smol] - sync
+    smolAddedTagPickOrder.value = getSmolAddedTagPickOrderConfig();
     smolInstancePollSeconds.value = getSmolInstancePollSecondsConfig();
     smolKeepWatchingAfterDialogClose.value =
       getSmolKeepWatchingAfterDialogCloseConfig();
@@ -423,6 +427,11 @@ export const useAdvancedSettingsStore = defineStore("AdvancedSettings", () => {
       "VRCX_translationAPIPrompt",
       translationApiPrompt.value,
     );
+  }
+
+  // [smol] - save advanced setting for instance watcher auto-open pick order
+  function setSmolAddedTagPickOrder(value) {
+    smolAddedTagPickOrder.value = saveSmolAddedTagPickOrderConfig(value);
   }
 
   // [smol] - save advanced setting for instance watcher poll rate
@@ -1147,9 +1156,11 @@ export const useAdvancedSettingsStore = defineStore("AdvancedSettings", () => {
     sentryErrorReporting,
 
     // [smol] - instance watcher settings
+    smolAddedTagPickOrder,
     smolInstancePollSeconds,
     smolKeepWatchingAfterDialogClose,
     smolShowAutoOpenNewInstancesButton,
+    setSmolAddedTagPickOrder,
     setSmolInstancePollSeconds,
     setSmolKeepWatchingAfterDialogClose,
     setSmolShowAutoOpenNewInstancesButton,

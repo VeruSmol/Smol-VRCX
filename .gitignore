@@ -18,3 +18,5 @@ Installer/VRCX_Setup.exe
 /VRCX_*_Setup.exe
 *.blockmap
 latest.yml
+future_veru_build_commands.md
+future_veru_build_commands.bat

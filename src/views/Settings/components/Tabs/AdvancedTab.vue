@@ -109,13 +109,55 @@
         <input
           v-model.number="smolInstancePollSecondsInput"
           type="number"
-          min="5"
+          min="3"
           max="300"
           step="1"
           class="h-8 w-24 rounded-md border border-input bg-background px-2 text-sm"
           @change="updateSmolInstancePollSeconds"
         />
       </SettingsItem>
+
+      <!-- [smol] - advanced setting for instance watcher pick order behavior -->
+      <SettingsItem
+        :label="
+          t(
+            'view.settings.advanced.advanced.smol_auto_open_pick_order.header',
+          )
+        "
+        :description="
+          t(
+            'view.settings.advanced.advanced.smol_auto_open_pick_order.description',
+          )
+        "
+      >
+        <Select
+          :model-value="smolAddedTagPickOrder"
+          @update:modelValue="setSmolAddedTagPickOrder"
+        >
+          <SelectTrigger class="w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="first_to_last">
+                {{
+                  t(
+                    'view.settings.advanced.advanced.smol_auto_open_pick_order.first_to_last',
+                  )
+                }}
+              </SelectItem>
+              <SelectItem value="last_to_first">
+                {{
+                  t(
+                    'view.settings.advanced.advanced.smol_auto_open_pick_order.last_to_first',
+                  )
+                }}
+              </SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </SettingsItem>
+
 
     </SettingsGroup>
 
@@ -798,6 +840,7 @@ const {
   smolInstancePollSeconds,
   smolKeepWatchingAfterDialogClose,
   smolShowAutoOpenNewInstancesButton,
+  smolAddedTagPickOrder,
 } = storeToRefs(advancedSettingsStore);
 
 const {
@@ -818,6 +861,7 @@ const {
   setSmolInstancePollSeconds,
   setSmolKeepWatchingAfterDialogClose,
   setSmolShowAutoOpenNewInstancesButton,
+  setSmolAddedTagPickOrder,
 } = advancedSettingsStore;
 
 const configTreeData = ref({});
@@ -856,7 +900,7 @@ function updateSmolInstancePollSeconds() {
     nextValue = smolInstancePollSeconds.value;
   }
 
-  nextValue = Math.max(5, Math.min(300, Math.floor(nextValue)));
+  nextValue = Math.max(3, Math.min(300, Math.floor(nextValue)));
   smolInstancePollSecondsInput.value = nextValue;
   setSmolInstancePollSeconds(nextValue);
 }

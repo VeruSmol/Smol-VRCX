@@ -34,7 +34,7 @@ import * as workerTimers from "worker-timers";
 let smolWatchNewInstances = false;
 let smolInstancePollTimerId = null;
 let smolInstancePollSeconds = Math.max(
-  5,
+  3,
   Math.min(
     300,
     Math.round(
@@ -68,9 +68,88 @@ let smolAutoOpenDurationSeconds = Math.max(
 let smolAutoOpenRemainingSeconds = 0;
 let smolAutoOpenCountdownTimerId = null;
 
+// [smol] - choose how newly added instances are checked
+// [smol] - default is first_to_last so the API array is used as-is
+let smolAddedTagPickOrder =
+  localStorage.getItem("smol-added-tag-pick-order") === "last_to_first"
+    ? "last_to_first"
+    : "first_to_last";
+
 // [smol] - use tag when available, otherwise fall back to location
 function getSmolRoomLocation(room) {
   return room?.tag || room?.location || "";
+}
+
+// [smol] - pull the numeric instance code from the location string when possible
+function getSmolRoomInstanceCode(room) {
+  const location = getSmolRoomLocation(room);
+  const match = location.match(/^[^:]+:([^~]+)/);
+  return match?.[1] || room?.name || "";
+}
+
+// [smol] - create a readable room label for logs and future UI
+function getSmolRoomLabel(room) {
+  const baseLabel =
+    room?.displayName ||
+    room?.name ||
+    getSmolRoomInstanceCode(room) ||
+    getSmolRoomLocation(room);
+
+  const details = [];
+
+  if (room?.groupAccessType) {
+    details.push(room.groupAccessType);
+  }
+
+  if (room?.region || room?.photonRegion) {
+    details.push(room.region || room.photonRegion);
+  }
+
+  const userCount =
+    typeof room?.userCount === "number"
+      ? room.userCount
+      : typeof room?.n_users === "number"
+        ? room.n_users
+        : null;
+
+  if (userCount !== null && typeof room?.capacity === "number") {
+    details.push(`${userCount}/${room.capacity}`);
+  }
+
+  return details.length > 0
+    ? `${baseLabel} [${details.join(" | ")}]`
+    : baseLabel;
+}
+
+// [smol] - create a compact room summary for console logging
+function getSmolRoomSummary(room, index, previousIndex = null) {
+  const location = getSmolRoomLocation(room);
+
+  return {
+    index,
+    previousIndex,
+    moved: previousIndex !== null ? previousIndex !== index : null,
+    isNew: location ? !smolLastWatchedTags.includes(location) : null,
+    label: getSmolRoomLabel(room),
+    displayName: room?.displayName || "",
+    name: room?.name || "",
+    shortName: room?.ref?.shortName || room?.shortName || "",
+    secureName: room?.secureName || "",
+    instanceCode: getSmolRoomInstanceCode(room),
+    instanceId: room?.instanceId || "",
+    scheduledAt: room?.scheduledAt || null,
+    active: room?.active ?? null,
+    full: room?.full ?? null,
+    userCount: room?.userCount ?? room?.n_users ?? null,
+    capacity: room?.capacity ?? null,
+    queueEnabled: room?.queueEnabled ?? null,
+    queueSize: room?.queueSize ?? null,
+    region: room?.region || room?.photonRegion || "",
+    groupAccessType: room?.groupAccessType || "",
+    ownerId: room?.ownerId || "",
+    worldId: room?.worldId || room?.world?.id || "",
+    location,
+  };
 }
 
 export function getSmolWatchNewInstances() {
@@ -92,7 +171,7 @@ export function getSmolInstancePollSeconds() {
 // [smol] - normalize and persist poll rate
 export function setSmolInstancePollSeconds(seconds) {
   const normalized = Math.max(
-    5,
+    3,
     Math.min(300, Math.round(Number(seconds) || 10)),
   );
   smolInstancePollSeconds = normalized;
@@ -139,6 +218,23 @@ export function getSmolWatchedGroupId() {
 
 export function getSmolWatchedGroupName() {
   return smolWatchedGroupName;
+}
+
+// [smol] - expose and persist picker order
+export function getSmolAddedTagPickOrder() {
+  return smolAddedTagPickOrder;
+}
+
+export function setSmolAddedTagPickOrder(value) {
+  smolAddedTagPickOrder =
+    value === "last_to_first" ? "last_to_first" : "first_to_last";
+
+  localStorage.setItem(
+    "smol-added-tag-pick-order",
+    smolAddedTagPickOrder,
+  );
+
+  return smolAddedTagPickOrder;
 }
 
 // [smol] - pretty label for poll rate UI
@@ -284,50 +380,55 @@ export function startSmolInstancePolling(groupId, existingRef) {
         groupId: smolWatchedGroupId,
       });
 
-      console.log(
-        "[Smol] Instance refresh success -",
-        args?.json?.instances?.length ?? 0,
-      );
+      const instances = Array.isArray(args?.json?.instances)
+        ? args.json.instances
+        : [];
+
+      console.log("[Smol] Instance refresh success -", instances.length);
 
       // [smol] - only update the visible dialog list if the watched group is the one currently open
       if (
         groupStore.groupDialog.visible &&
         groupStore.groupDialog.id === smolWatchedGroupId
       ) {
-        instanceStore.applyGroupDialogInstances(args.json.instances);
+        instanceStore.applyGroupDialogInstances(instances);
       }
 
-      for (const json of args.json.instances) {
+      for (const json of instances) {
         instanceStore.applyInstance(json);
-        queryRequest
-          .fetch("world.dialog", {
-            worldId: json.world.id,
-          })
-          .then((args1) => {
-            json.world = args1.ref;
-          });
 
-        // get queue size etc
-        instanceRequest.getInstance({
-          worldId: json.worldId,
-          instanceId: json.instanceId,
-        });
+        // [smol] - safely resolve world info when the world id exists
+        const worldId = json?.world?.id || json?.worldId;
+        if (worldId) {
+          queryRequest
+            .fetch("world.dialog", {
+              worldId,
+            })
+            .then((args1) => {
+              json.world = args1.ref;
+            });
+        }
+
+        // [smol] - fetch extra instance detail only when ids exist
+        if (json?.worldId && json?.instanceId) {
+          instanceRequest.getInstance({
+            worldId: json.worldId,
+            instanceId: json.instanceId,
+          });
+        }
       }
 
-      handleSmolObservedInstances(args?.json?.instances ?? []);
+      handleSmolObservedInstances(instances);
     } catch (err) {
       // [smol] - logic to stop if request.js throws a 429 error (tysm)
       if (err?.status === 429) {
-        console.warn(
-          "[Smol] API returned 429 rate-limit. Stopping watcher",
-          {
-            status: err?.status,
-            endpoint: err?.endpoint,
-            message: err?.message,
-          },
-        );
+        console.warn("[Smol] API returned 429 rate-limit. Stopping watcher", {
+          status: err?.status,
+          endpoint: err?.endpoint,
+          message: err?.message,
+        });
 
-        // [smol] - Set watcher state to off
+        // [smol] - set watcher state to off
         smolWatchNewInstances = false;
 
         // [smol] - reason string
@@ -340,7 +441,8 @@ export function startSmolInstancePolling(groupId, existingRef) {
   }, smolInstancePollSeconds * 1000);
 }
 
-// [smol] - detect new instances and open the newest one in VRChat
+// [smol] - detect newly seen instances, log richer room details,
+// [smol] - and choose using the configured tag pick order
 export function handleSmolObservedInstances(instances) {
   const groupStore = useGroupStore();
   const launchStore = useLaunchStore();
@@ -354,6 +456,41 @@ export function handleSmolObservedInstances(instances) {
     (tag) => !smolLastWatchedTags.includes(tag),
   );
 
+  // [smol] - map previous positions so we can see if the API re-ordered rooms
+  const previousIndexByTag = new Map(
+    smolLastWatchedTags.map((tag, index) => [tag, index]),
+  );
+
+  // [smol] - rich summaries for every room returned this poll
+  const roomSummaries = safeInstances.map((room, index) =>
+    getSmolRoomSummary(
+      room,
+      index,
+      previousIndexByTag.has(getSmolRoomLocation(room))
+        ? previousIndexByTag.get(getSmolRoomLocation(room))
+        : null,
+    ),
+  );
+
+  // [smol] - rich summaries for only newly added rooms
+  const addedRoomSummaries = safeInstances.flatMap((room, index) => {
+    const location = getSmolRoomLocation(room);
+
+    if (!addedTags.includes(location)) {
+      return [];
+    }
+
+    return [
+      getSmolRoomSummary(
+        room,
+        index,
+        previousIndexByTag.has(location)
+          ? previousIndexByTag.get(location)
+          : null,
+      ),
+    ];
+  });
+
   console.log("[Smol][AUTO] currentTags:", currentTags);
   console.log("[Smol][AUTO] lastWatchedTags:", smolLastWatchedTags);
   console.log("[Smol][AUTO] addedTags:", addedTags);
@@ -365,6 +502,14 @@ export function handleSmolObservedInstances(instances) {
     groupStore.groupDialog.visible,
     groupStore.groupDialog.id,
   );
+
+  console.groupCollapsed("[Smol][AUTO] room summaries");
+  console.table(roomSummaries);
+  console.groupEnd();
+
+  console.groupCollapsed("[Smol][AUTO] added room summaries");
+  console.table(addedRoomSummaries);
+  console.groupEnd();
 
   // [smol] - keep baseline updated even when watcher is off
   if (!smolWatchNewInstances) {
@@ -391,9 +536,18 @@ export function handleSmolObservedInstances(instances) {
     return addedTags;
   }
 
-  const newLocation = [...addedTags]
-    .reverse()
-    .find((tag) => tag && tag !== smolLastWatchedLocation);
+  // [smol] - walk the newly added tags in the configured order
+  const orderedAddedTags =
+    smolAddedTagPickOrder === "last_to_first"
+      ? [...addedTags].reverse()
+      : [...addedTags];
+
+  console.log("[Smol][AUTO] addedTagPickOrder:", smolAddedTagPickOrder);
+  console.log("[Smol][AUTO] orderedAddedTags:", orderedAddedTags);
+
+  const newLocation = orderedAddedTags.find(
+    (tag) => tag && tag !== smolLastWatchedLocation,
+  );
 
   console.log("[Smol][AUTO] chosen newLocation:", newLocation);
 
@@ -403,9 +557,25 @@ export function handleSmolObservedInstances(instances) {
     return addedTags;
   }
 
-  const newRoom = safeInstances.find(
+  const chosenIndex = safeInstances.findIndex(
     (room) => getSmolRoomLocation(room) === newLocation,
   );
+
+  const newRoom = chosenIndex >= 0 ? safeInstances[chosenIndex] : null;
+
+  console.log(
+    "[Smol][AUTO] chosen room summary:",
+    newRoom
+      ? getSmolRoomSummary(
+          newRoom,
+          chosenIndex,
+          previousIndexByTag.has(newLocation)
+            ? previousIndexByTag.get(newLocation)
+            : null,
+        )
+      : null,
+  );
+
   console.log("[Smol][AUTO] matched room:", newRoom);
 
   if (!newRoom) {
@@ -414,7 +584,11 @@ export function handleSmolObservedInstances(instances) {
     return addedTags;
   }
 
-  const shortName = newRoom?.ref?.shortName || newRoom?.shortName || "";
+  const shortName =
+    newRoom?.ref?.shortName ||
+    newRoom?.shortName ||
+    newRoom?.secureName ||
+    "";
 
   console.log("[Smol][AUTO] about to call tryOpenInstanceInVrc:", {
     newLocation,
@@ -687,7 +861,9 @@ export function showGroupDialog(groupId, options = {}) {
   const forceRefresh = Boolean(options?.forceRefresh);
   const isMainDialogOpen = uiStore.openDialog({
     type: "group",
-    id: groupId,
+    id: String(groupId),
+    tag: "",
+    shortName: "",
   });
   const D = groupStore.groupDialog;
   D.visible = true;
@@ -728,7 +904,7 @@ export function showGroupDialog(groupId, options = {}) {
       throw err;
     })
     .then((args) => {
-      const ref = args.ref || applyGroup(args.json);
+      const ref = applyGroup(args.json);
       if (groupId === ref.id) {
         D.ref = ref;
         uiStore.setDialogCrumbLabel("group", D.id, D.ref?.name || D.id);
@@ -767,7 +943,7 @@ export function getGroupDialogGroup(groupId, existingRef) {
   D.isGetGroupDialogGroupLoading = false;
 
   const refPromise = existingRef
-    ? Promise.resolve({ ref: existingRef })
+    ? Promise.resolve({ ref: existingRef, args: null })
     : queryRequest
         .fetch("group.dialog", { groupId, includeRoles: true })
         .then((args) => ({ ref: applyGroup(args.json), args }));
@@ -797,38 +973,47 @@ export function getGroupDialogGroup(groupId, existingRef) {
           groupId,
         });
         D.isGetGroupDialogGroupLoading = true;
-        groupRequest
-          .getGroupInstances({
-            groupId,
-          })
-          .then((args) => {
-            console.log(
-              "[Smol] VRC API reported - ",
-              args?.json?.instances?.length ?? 0,
-              "instances",
-            );
+        groupRequest.getGroupInstances({ groupId }).then((args) => {
+          const instances = Array.isArray(args?.json?.instances)
+            ? args.json.instances
+            : [];
 
-            if (groupStore.groupDialog.id === args.params.groupId) {
-              instanceStore.applyGroupDialogInstances(args.json.instances);
-            }
-            for (const json of args.json.instances) {
-              instanceStore.applyInstance(json);
+          console.log(
+            "[Smol] VRC API reported - ",
+            instances.length,
+            "instances",
+          );
+
+          if (groupStore.groupDialog.id === args.params.groupId) {
+            instanceStore.applyGroupDialogInstances(instances);
+          }
+
+          for (const json of instances) {
+            instanceStore.applyInstance(json);
+
+            // [smol] - safely resolve world info when the world id exists
+            const worldId = json?.world?.id || json?.worldId;
+            if (worldId) {
               queryRequest
                 .fetch("world.dialog", {
-                  worldId: json.world.id,
+                  worldId,
                 })
                 .then((args1) => {
                   json.world = args1.ref;
                 });
-              // get queue size etc
+            }
+
+            // [smol] - fetch extra instance detail only when ids exist
+            if (json?.worldId && json?.instanceId) {
               instanceRequest.getInstance({
                 worldId: json.worldId,
                 instanceId: json.instanceId,
               });
             }
+          }
 
-            handleSmolObservedInstances(args?.json?.instances ?? []);
-          });
+          handleSmolObservedInstances(instances);
+        });
         queryRequest.fetch("groupCalendar", { groupId }).then((args) => {
           if (groupStore.groupDialog.id === args.params.groupId) {
             D.calendar = args.json.results;
@@ -848,7 +1033,7 @@ export function getGroupDialogGroup(groupId, existingRef) {
         });
       }
       nextTick(() => (D.isGetGroupDialogGroupLoading = false));
-      return result.args || result;
+      return result.args || { ref: result.ref };
     });
 }
 
@@ -1069,22 +1254,23 @@ export async function initUserGroups() {
   );
 }
 
-/**
- *
- */
 export async function updateInGameGroupOrder() {
   const groupStore = useGroupStore();
   const gameStore = useGameStore();
   const userStore = useUserStore();
   groupStore.setInGameGroupOrder([]);
+
   try {
     const json = await gameStore.getVRChatRegistryKey(
       `VRC_GROUP_ORDER_${userStore.currentUser.id}`,
     );
-    if (!json) {
+    if (typeof json !== "string" || !json) {
       return;
     }
-    groupStore.setInGameGroupOrder(JSON.parse(json));
+    const parsed = JSON.parse(json);
+    if (Array.isArray(parsed)) {
+      groupStore.setInGameGroupOrder(parsed);
+    }
   } catch (err) {
     console.error(err);
   }
@@ -1189,7 +1375,8 @@ export function handleGroupRepresented(args) {
   const D = userStore.userDialog;
   const json = args.json;
   D.representedGroup = json;
-  D.representedGroup.$thumbnailUrl = convertFileUrlToImageUrl(json.iconUrl);
+  const iconUrl = typeof json.iconUrl === "string" ? json.iconUrl : "";
+  D.representedGroup.$thumbnailUrl = convertFileUrlToImageUrl(iconUrl);
   if (!json || !json.isRepresenting) {
     D.isRepresentedGroupLoading = false;
   }

@@ -1069,12 +1069,18 @@
                         "description": "Self Invite Instead of Opening Instance in VRChat"
                     },
                     "smol_show_auto_open_controls": {
-                        "header": "Show Auto-Open Instance Controls",
-                        "description": "Show or hide the auto-open controls in the Group Instances tab."                    
+                    "header": "Show Auto-Open Instance Controls",
+                    "description": "Show or hide the auto-open controls in the Group Instances tab."
+                    },
+                    "smol_auto_open_pick_order": {
+                    "header": "Auto-Open Instance Pick Order",
+                    "description": "Choose whether to open the first or last instance returned by the API when multiple instances are detected simultaneously.",
+                    "first_to_last": "First -> Last",
+                    "last_to_first": "Last -> First"
                     },
                     "smol_instance_poll_rate": {
-                        "header": "Instance Poll Rate (seconds)",
-                        "description": "How often VRCX checks for new instances while auto-open is active."
+                    "header": "Instance Poll Rate (seconds)",
+                    "description": "How often VRCX checks for new instances while auto-open is active."
                     },
                     "smol_keep_watching_after_close": {
                         "header": "Keep Watching After Closing Group Dialog",
