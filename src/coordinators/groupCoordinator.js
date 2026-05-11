@@ -327,8 +327,41 @@ export function startSmolInstancePolling(groupId, existingRef) {
   localStorage.setItem("smol-watched-group-id", smolWatchedGroupId);
   localStorage.setItem("smol-watched-group-name", smolWatchedGroupName);
 
-  // [smol] - baseline current visible rooms so existing instances are not immediately treated as new
+  // [smol] - seed visible rooms first
   seedSmolObservedInstances(groupStore.groupDialog.instances);
+
+  console.log("[Smol][AUTO] baseline seeded from visible dialog:", {
+    watchedGroupId: smolWatchedGroupId,
+    instanceCount: groupStore.groupDialog.instances.length,
+  });
+
+  // [smol] - seed from API so the watcher does not start empty
+  groupRequest
+    .getGroupInstances({
+      groupId: smolWatchedGroupId,
+    })
+    .then((args) => {
+      const instances = Array.isArray(args?.json?.instances)
+        ? args.json.instances
+        : [];
+
+      seedSmolObservedInstances(instances);
+
+      console.log("[Smol][AUTO] baseline seeded from API:", {
+        watchedGroupId: smolWatchedGroupId,
+        instanceCount: instances.length,
+      });
+
+      if (
+        groupStore.groupDialog.visible &&
+        groupStore.groupDialog.id === smolWatchedGroupId
+      ) {
+        instanceStore.applyGroupDialogInstances(instances);
+      }
+    })
+    .catch((err) => {
+      console.error("[Smol][AUTO] baseline seed failed:", err);
+    });
 
   smolAutoOpenRemainingSeconds = smolAutoOpenDurationSeconds;
 
@@ -832,7 +865,7 @@ function groupRoleChange(ref, oldRoles, newRoles, oldRoleIds, newRoleIds) {
     }
   }
   if (typeof newRoles !== "undefined") {
-    for (const roleId of newRoleIds) {
+    for (const roleId of newRoles) {
       if (!oldRoleIds.includes(roleId)) {
         let roleName = "";
         const role = newRoles.find((fineRole) => fineRole.id === roleId);
@@ -1012,7 +1045,13 @@ export function getGroupDialogGroup(groupId, existingRef) {
             }
           }
 
-          seedSmolObservedInstancesSmolObservedInstances(instances);
+          // [smol] - opening the group page only seeds the watcher
+          seedSmolObservedInstances(instances);
+
+          console.log("[Smol][AUTO] baseline seeded from group page:", {
+            groupId,
+            instanceCount: instances.length,
+          });
         });
         queryRequest.fetch("groupCalendar", { groupId }).then((args) => {
           if (groupStore.groupDialog.id === args.params.groupId) {
