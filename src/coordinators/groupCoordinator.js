@@ -441,8 +441,8 @@ export function startSmolInstancePolling(groupId, existingRef) {
   }, smolInstancePollSeconds * 1000);
 }
 
-// [smol] - detect newly seen instances, log richer room details,
-// [smol] - and choose using the configured tag pick order
+// [smol] - detect newly seen instances, log more room details, and choose using the configured tag pick order
+
 export function handleSmolObservedInstances(instances) {
   const groupStore = useGroupStore();
   const launchStore = useLaunchStore();
@@ -613,6 +613,34 @@ export function handleSmolObservedInstances(instances) {
   smolLastWatchedTags = [...currentTags];
   return addedTags;
 }
+
+// [smol] - listen for instance updates from sender in instance.js 
+if (typeof window !== "undefined" && !window.__smolGroupInstancesUpdatedHook) {
+  window.__smolGroupInstancesUpdatedHook = true;
+
+  window.addEventListener("smol-group-instances-updated", (event) => {
+    const groupId = event?.detail?.groupId || "";
+    const instances = Array.isArray(event?.detail?.instances)
+      ? event.detail.instances
+      : [];
+
+    if (!smolWatchNewInstances) {
+      return;
+    }
+
+    if (!smolWatchedGroupId || groupId !== smolWatchedGroupId) {
+      return;
+    }
+
+    console.log("[Smol][AUTO] websocket instance list updated:", {
+      groupId,
+      instanceCount: instances.length,
+    });
+
+    handleSmolObservedInstances(instances);
+  });
+}
+
 
 /**
  * @param ref

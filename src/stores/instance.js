@@ -1089,6 +1089,16 @@ export const useInstanceStore = defineStore('Instance', () => {
             return -1;
         });
         D.instances = rooms;
+
+        // [smol] Send the watcher the group ID and instances when updated via websocket
+        window.dispatchEvent(
+            new CustomEvent('smol-group-instances-updated', {
+                detail: {
+                    groupId: D.id,
+                    instances: rooms
+                }
+            })
+        );
     }
 
     /**
