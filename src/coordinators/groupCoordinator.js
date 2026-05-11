@@ -614,34 +614,6 @@ export function handleSmolObservedInstances(instances) {
   return addedTags;
 }
 
-// [smol] - listen for instance updates from sender in instance.js 
-if (typeof window !== "undefined" && !window.__smolGroupInstancesUpdatedHook) {
-  window.__smolGroupInstancesUpdatedHook = true;
-
-  window.addEventListener("smol-group-instances-updated", (event) => {
-    const groupId = event?.detail?.groupId || "";
-    const instances = Array.isArray(event?.detail?.instances)
-      ? event.detail.instances
-      : [];
-
-    if (!smolWatchNewInstances) {
-      return;
-    }
-
-    if (!smolWatchedGroupId || groupId !== smolWatchedGroupId) {
-      return;
-    }
-
-    console.log("[Smol][AUTO] websocket instance list updated:", {
-      groupId,
-      instanceCount: instances.length,
-    });
-
-    handleSmolObservedInstances(instances);
-  });
-}
-
-
 /**
  * @param ref
  */
@@ -1040,7 +1012,7 @@ export function getGroupDialogGroup(groupId, existingRef) {
             }
           }
 
-          handleSmolObservedInstances(instances);
+          seedSmolObservedInstancesSmolObservedInstances(instances);
         });
         queryRequest.fetch("groupCalendar", { groupId }).then((args) => {
           if (groupStore.groupDialog.id === args.params.groupId) {
