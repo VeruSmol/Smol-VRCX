@@ -17,7 +17,8 @@ import {
     onGroupLeft,
     applyGroup,
     getGroupDialogGroup,
-    handleGroupMember
+    handleGroupMember,
+    addSmolWebsocketInstanceLocationsFromContent
 } from '../coordinators/groupCoordinator';
 import {
     handleFriendAdd,
@@ -314,6 +315,10 @@ function handlePipeline(args) {
                 console.error('friend-online missing user id', content);
                 runUpdateFriendFlow(content.userId, 'online');
             }
+            addSmolWebsocketInstanceLocationsFromContent(
+                content,
+                'friend-online'
+            );
             break;
 
         case 'friend-active':
@@ -377,6 +382,10 @@ function handlePipeline(args) {
                     travelingToInstance: $travelingToLocation1.instanceId
                 };
                 applyUser(jankLocationJson);
+                addSmolWebsocketInstanceLocationsFromContent(
+                    content,
+                    'friend-location'
+                );
                 break;
             }
             const locationJson = {
@@ -390,6 +399,10 @@ function handlePipeline(args) {
                 state: 'online' // JANK
             };
             applyUser(locationJson);
+            addSmolWebsocketInstanceLocationsFromContent(
+                content,
+                'friend-location'
+            );
 
             break;
 
@@ -412,6 +425,10 @@ function handlePipeline(args) {
             runSetCurrentUserLocationFlow(
                 content.location,
                 content.travelingToLocation
+            );
+            addSmolWebsocketInstanceLocationsFromContent(
+                content,
+                'user-location'
             );
             break;
 

@@ -5,6 +5,7 @@ import { i18n } from "../plugins/i18n";
 import {
   convertFileUrlToImageUrl,
   createDefaultGroupRef,
+  parseLocation,
   sanitizeEntityJson,
 } from "../shared/utils";
 import { groupRequest, instanceRequest, queryRequest } from "../api";
@@ -152,6 +153,158 @@ function getSmolRoomSummary(room, index, previousIndex = null) {
   };
 }
 
+// [smol] - websocket rooms by group
+const smolWebsocketRoomsByGroupId = new Map();
+
+// [smol] - get group id from location
+function getSmolGroupIdFromLocation(location) {
+  if (typeof location !== "string") {
+    return "";
+  }
+
+  const match = location.match(/~group\((grp_[^)]+)\)/);
+  return match?.[1] || "";
+}
+
+// [smol] - merge API rooms and websocket rooms
+function getSmolMergedInstances(apiInstances, groupId) {
+  const merged = new Map();
+
+  if (Array.isArray(apiInstances)) {
+    for (const room of apiInstances) {
+      const location = getSmolRoomLocation(room);
+
+      if (location) {
+        merged.set(location, room);
+      }
+    }
+  }
+
+  const websocketRooms = smolWebsocketRoomsByGroupId.get(groupId);
+
+  if (websocketRooms) {
+    for (const [location, room] of websocketRooms) {
+      if (!merged.has(location)) {
+        merged.set(location, room);
+      }
+    }
+  }
+
+  return [...merged.values()];
+}
+
+// [smol] - don't trust empty API lists for groups we aren't in
+function shouldSmolIgnoreEmptyApiList(instances, groupId, observedInstances = []) {
+  return (
+    smolWatchNewInstances &&
+    groupId === smolWatchedGroupId &&
+    !smolWatchedGroupIsMember &&
+    Array.isArray(instances) &&
+    instances.length === 0 &&
+    Array.isArray(observedInstances) &&
+    observedInstances.length === 0
+  );
+}
+
+// [smol] - add websocket room and interrupt watcher if needed
+export function addSmolWebsocketInstanceLocation(location, source = "websocket") {
+  if (typeof location !== "string" || !location.startsWith("wrld_")) {
+    return;
+  }
+
+  const L = parseLocation(location);
+  const groupId = L?.groupId || getSmolGroupIdFromLocation(location);
+
+  if (!groupId) {
+    return;
+  }
+
+  let rooms = smolWebsocketRoomsByGroupId.get(groupId);
+
+  if (!rooms) {
+    rooms = new Map();
+    smolWebsocketRoomsByGroupId.set(groupId, rooms);
+  }
+
+  const alreadyHadRoom = rooms.has(location);
+
+  const room = {
+    id: L?.instanceId || location,
+    tag: location,
+    location,
+    $location: L,
+    friendCount: 1,
+    users: [],
+    shortName: L?.shortName || "",
+    ref: {
+      id: location,
+      location,
+      instanceId: L?.instanceId || "",
+      worldId: L?.worldId || "",
+      ownerId: groupId,
+      shortName: L?.shortName || "",
+      source,
+    },
+  };
+
+  rooms.set(location, room);
+
+  console.log("[Smol][AUTO] websocket room saved:", {
+    groupId,
+    location,
+    source,
+    alreadyHadRoom,
+  });
+
+  if (alreadyHadRoom) {
+    console.log("[Smol][AUTO] websocket ignored: already had room");
+    return;
+  }
+
+  if (!smolWatchNewInstances) {
+    console.log("[Smol][AUTO] websocket ignored: watcher off");
+    return;
+  }
+
+  if (!smolWatchedGroupId) {
+    console.log("[Smol][AUTO] websocket ignored: no watched group");
+    return;
+  }
+
+  if (groupId !== smolWatchedGroupId) {
+    console.log("[Smol][AUTO] websocket ignored: different group", {
+      groupId,
+      watchedGroupId: smolWatchedGroupId,
+    });
+    return;
+  }
+
+  const observedInstances = getSmolMergedInstances([], smolWatchedGroupId);
+
+  // [smol] - if this is the first list, save it but don't open
+  if (smolLastWatchedTags.length === 0) {
+    seedSmolObservedInstances(observedInstances);
+    console.log("[Smol][AUTO] websocket baseline saved");
+    return;
+  }
+
+  console.log("[Smol][AUTO] websocket interrupt:", {
+    groupId,
+    location,
+  });
+
+  handleSmolObservedInstances(observedInstances, "websocket");
+}
+
+// [smol] - save websocket locations
+export function addSmolWebsocketInstanceLocationsFromContent(
+  content,
+  source = "websocket",
+) {
+  addSmolWebsocketInstanceLocation(content?.location, source);
+  addSmolWebsocketInstanceLocation(content?.travelingToLocation, source);
+}
+
 export function getSmolWatchNewInstances() {
   return smolWatchNewInstances;
 }
@@ -256,9 +409,22 @@ export function getSmolInstancePollSecondsLabel(value) {
 
 // [smol] - seed current instances as baseline so existing instances are not treated as newly opened
 export function seedSmolObservedInstances(instances) {
-  smolLastWatchedTags = Array.isArray(instances)
+  const tags = Array.isArray(instances)
     ? instances.map((room) => getSmolRoomLocation(room)).filter(Boolean)
     : [];
+
+  // [smol] - don't let empty refreshes overwrite a real baseline
+  if (tags.length === 0 && smolLastWatchedTags.length > 0) {
+    console.log("[Smol][AUTO] seed skipped: empty list");
+    return;
+  }
+
+  smolLastWatchedTags = tags;
+
+  console.log("[Smol][AUTO] baseline saved:", {
+    instanceCount: smolLastWatchedTags.length,
+    tags: smolLastWatchedTags,
+  });
 }
 
 // [smol] - reset watcher state when dialog closes or context changes
@@ -295,7 +461,6 @@ export function stopSmolInstancePolling(reason = "") {
     reason,
   );
 }
-
 // [smol] - start polling loop
 export function startSmolInstancePolling(groupId, existingRef) {
   stopSmolInstancePolling(
@@ -327,15 +492,20 @@ export function startSmolInstancePolling(groupId, existingRef) {
   localStorage.setItem("smol-watched-group-id", smolWatchedGroupId);
   localStorage.setItem("smol-watched-group-name", smolWatchedGroupName);
 
-  // [smol] - seed visible rooms first
-  seedSmolObservedInstances(groupStore.groupDialog.instances);
+  // [smol] - seed visible and websocket rooms first
+  seedSmolObservedInstances(
+    getSmolMergedInstances(
+      groupStore.groupDialog.instances,
+      smolWatchedGroupId,
+    ),
+  );
 
   console.log("[Smol][AUTO] baseline seeded from visible dialog:", {
     watchedGroupId: smolWatchedGroupId,
     instanceCount: groupStore.groupDialog.instances.length,
   });
 
-  // [smol] - seed from API so the watcher does not start empty
+  // [smol] - seed from API when it returns something useful
   groupRequest
     .getGroupInstances({
       groupId: smolWatchedGroupId,
@@ -344,19 +514,34 @@ export function startSmolInstancePolling(groupId, existingRef) {
       const instances = Array.isArray(args?.json?.instances)
         ? args.json.instances
         : [];
+      const observedInstances = getSmolMergedInstances(
+        instances,
+        smolWatchedGroupId,
+      );
 
-      seedSmolObservedInstances(instances);
+      if (
+        shouldSmolIgnoreEmptyApiList(
+          instances,
+          smolWatchedGroupId,
+          observedInstances,
+        )
+      ) {
+        console.log("[Smol][AUTO] empty API ignored for non-member group");
+        return;
+      }
+
+      seedSmolObservedInstances(observedInstances);
 
       console.log("[Smol][AUTO] baseline seeded from API:", {
         watchedGroupId: smolWatchedGroupId,
-        instanceCount: instances.length,
+        instanceCount: observedInstances.length,
       });
 
       if (
         groupStore.groupDialog.visible &&
         groupStore.groupDialog.id === smolWatchedGroupId
       ) {
-        instanceStore.applyGroupDialogInstances(instances);
+        instanceStore.applyGroupDialogInstances(observedInstances);
       }
     })
     .catch((err) => {
@@ -416,15 +601,31 @@ export function startSmolInstancePolling(groupId, existingRef) {
       const instances = Array.isArray(args?.json?.instances)
         ? args.json.instances
         : [];
+      const observedInstances = getSmolMergedInstances(
+        instances,
+        smolWatchedGroupId,
+      );
 
       console.log("[Smol] Instance refresh success -", instances.length);
+      console.log("[Smol][AUTO] observed instances -", observedInstances.length);
+
+      if (
+        shouldSmolIgnoreEmptyApiList(
+          instances,
+          smolWatchedGroupId,
+          observedInstances,
+        )
+      ) {
+        console.log("[Smol][AUTO] empty poll ignored for non-member group");
+        return;
+      }
 
       // [smol] - only update the visible dialog list if the watched group is the one currently open
       if (
         groupStore.groupDialog.visible &&
         groupStore.groupDialog.id === smolWatchedGroupId
       ) {
-        instanceStore.applyGroupDialogInstances(instances);
+        instanceStore.applyGroupDialogInstances(observedInstances);
       }
 
       for (const json of instances) {
@@ -451,7 +652,7 @@ export function startSmolInstancePolling(groupId, existingRef) {
         }
       }
 
-      handleSmolObservedInstances(instances);
+      handleSmolObservedInstances(observedInstances, "api");
     } catch (err) {
       // [smol] - logic to stop if request.js throws a 429 error (tysm)
       if (err?.status === 429) {
@@ -475,8 +676,7 @@ export function startSmolInstancePolling(groupId, existingRef) {
 }
 
 // [smol] - detect newly seen instances, log more room details, and choose using the configured tag pick order
-
-export function handleSmolObservedInstances(instances) {
+export function handleSmolObservedInstances(instances, source = "api") {
   const groupStore = useGroupStore();
   const launchStore = useLaunchStore();
 
@@ -488,6 +688,14 @@ export function handleSmolObservedInstances(instances) {
   const addedTags = currentTags.filter(
     (tag) => !smolLastWatchedTags.includes(tag),
   );
+
+  // [smol] - don't let empty refreshes overwrite a real baseline
+  if (currentTags.length === 0 && smolLastWatchedTags.length > 0) {
+    console.log("[Smol][AUTO] abort: empty list, keeping baseline", {
+      source,
+    });
+    return addedTags;
+  }
 
   // [smol] - map previous positions so we can see if the API re-ordered rooms
   const previousIndexByTag = new Map(
@@ -524,6 +732,7 @@ export function handleSmolObservedInstances(instances) {
     ];
   });
 
+  console.log("[Smol][AUTO] source:", source);
   console.log("[Smol][AUTO] currentTags:", currentTags);
   console.log("[Smol][AUTO] lastWatchedTags:", smolLastWatchedTags);
   console.log("[Smol][AUTO] addedTags:", addedTags);
@@ -646,7 +855,6 @@ export function handleSmolObservedInstances(instances) {
   smolLastWatchedTags = [...currentTags];
   return addedTags;
 }
-
 /**
  * @param ref
  */
@@ -865,7 +1073,7 @@ function groupRoleChange(ref, oldRoles, newRoles, oldRoleIds, newRoleIds) {
     }
   }
   if (typeof newRoles !== "undefined") {
-    for (const roleId of newRoles) {
+    for (const roleId of newRoleIds) {
       if (!oldRoleIds.includes(roleId)) {
         let roleName = "";
         const role = newRoles.find((fineRole) => fineRole.id === roleId);
@@ -962,7 +1170,6 @@ export function showGroupDialog(groupId, options = {}) {
       }
     });
 }
-
 /**
  *
  * @param groupId
@@ -1010,15 +1217,30 @@ export function getGroupDialogGroup(groupId, existingRef) {
           const instances = Array.isArray(args?.json?.instances)
             ? args.json.instances
             : [];
+          const observedInstances = getSmolMergedInstances(instances, groupId);
+          const ignoreEmptyApiList = shouldSmolIgnoreEmptyApiList(
+            instances,
+            groupId,
+            observedInstances,
+          );
 
           console.log(
             "[Smol] VRC API reported - ",
             instances.length,
             "instances",
           );
+          console.log(
+            "[Smol][AUTO] observed instances -",
+            observedInstances.length,
+          );
 
           if (groupStore.groupDialog.id === args.params.groupId) {
-            instanceStore.applyGroupDialogInstances(instances);
+            if (ignoreEmptyApiList) {
+              // [smol] - rebuild from visible/cache data instead
+              instanceStore.applyGroupDialogInstances();
+            } else {
+              instanceStore.applyGroupDialogInstances(observedInstances);
+            }
           }
 
           for (const json of instances) {
@@ -1045,14 +1267,29 @@ export function getGroupDialogGroup(groupId, existingRef) {
             }
           }
 
-          // [smol] - opening the group page only seeds the watcher
-          seedSmolObservedInstances(instances);
+          // [smol] - opening the group page only seeds when watcher is off
+          if (ignoreEmptyApiList) {
+            console.log(
+              "[Smol][AUTO] group page API ignored for non-member group",
+              {
+                groupId,
+              },
+            );
+          } else if (!smolWatchNewInstances) {
+            seedSmolObservedInstances(observedInstances);
 
-          console.log("[Smol][AUTO] baseline seeded from group page:", {
-            groupId,
-            instanceCount: instances.length,
-          });
+            console.log("[Smol][AUTO] baseline seeded from group page:", {
+              groupId,
+              instanceCount: observedInstances.length,
+            });
+          } else if (groupId === smolWatchedGroupId) {
+            console.log("[Smol][AUTO] group page baseline skipped while watching:", {
+              groupId,
+              instanceCount: observedInstances.length,
+            });
+          }
         });
+        
         queryRequest.fetch("groupCalendar", { groupId }).then((args) => {
           if (groupStore.groupDialog.id === args.params.groupId) {
             D.calendar = args.json.results;
