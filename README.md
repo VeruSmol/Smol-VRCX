@@ -15,7 +15,7 @@
 ## Automatically parse VRCDN Preview links from player links
 - Clicking **Open** on a video play link in the Game Log will open the preview in your default browser.
 - Helpful for quickly checking the link in the world is live!
-- Supports RTMP, RTSPT, and HTTPS VRCDN player links. *(all VRCDN links as of March '26 should open correctly)*
+- Supports RTMP, RTSPT, and HTTPS VRCDN player links. *(all VRCDN links as of June '26 should open correctly)*
 - When world audio sounds strange, checking the preview can help isolate the issue. 
 
 ## Dedicated Group Info Page

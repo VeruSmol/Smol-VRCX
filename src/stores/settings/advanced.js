@@ -21,6 +21,8 @@ import {
   setSmolInstancePollSeconds as saveSmolInstancePollSecondsConfig,
   getSmolKeepWatchingAfterDialogClose as getSmolKeepWatchingAfterDialogCloseConfig,
   setSmolKeepWatchingAfterDialogClose as saveSmolKeepWatchingAfterDialogCloseConfig,
+  getSmolSelfInviteWithAutoOpen as getSmolSelfInviteWithAutoOpenConfig,
+  setSmolSelfInviteWithAutoOpen as saveSmolSelfInviteWithAutoOpenConfig,
   getSmolAddedTagPickOrder as getSmolAddedTagPickOrderConfig,
   setSmolAddedTagPickOrder as saveSmolAddedTagPickOrderConfig,
   getSmolWatchNewInstances,
@@ -93,6 +95,7 @@ export const useAdvancedSettingsStore = defineStore("AdvancedSettings", () => {
   const smolKeepWatchingAfterDialogClose = ref(
     getSmolKeepWatchingAfterDialogCloseConfig(),
   );
+  const smolSelfInviteWithAutoOpen = ref(getSmolSelfInviteWithAutoOpenConfig());
   const smolShowAutoOpenNewInstancesButton = ref(true);
 
   watch(
@@ -226,17 +229,17 @@ export const useAdvancedSettingsStore = defineStore("AdvancedSettings", () => {
     vrcRegistryAutoBackup.value = vrcRegistryAutoBackupConfig;
     vrcRegistryAskRestore.value = vrcRegistryAskRestoreConfig;
     sentryErrorReporting.value = sentryErrorReportingConfig === "true";
-    smolShowAutoOpenNewInstancesButton.value = smolShowAutoOpenNewInstancesButtonConfig;
+    smolShowAutoOpenNewInstancesButton.value =
+      smolShowAutoOpenNewInstancesButtonConfig;
 
     // [smol] - sync
     smolAddedTagPickOrder.value = getSmolAddedTagPickOrderConfig();
     smolInstancePollSeconds.value = getSmolInstancePollSecondsConfig();
     smolKeepWatchingAfterDialogClose.value =
       getSmolKeepWatchingAfterDialogCloseConfig();
+    smolSelfInviteWithAutoOpen.value = getSmolSelfInviteWithAutoOpenConfig();
 
     handleSetAppLauncherSettings();
-
-
 
     setTimeout(() => {
       if (
@@ -444,6 +447,13 @@ export const useAdvancedSettingsStore = defineStore("AdvancedSettings", () => {
     smolKeepWatchingAfterDialogClose.value =
       saveSmolKeepWatchingAfterDialogCloseConfig(value);
   }
+
+  // [smol] - save advanced setting for also self-inviting when watcher auto-opens
+  function setSmolSelfInviteWithAutoOpen(value) {
+    smolSelfInviteWithAutoOpen.value =
+      saveSmolSelfInviteWithAutoOpenConfig(value);
+  }
+
   // [smol] - setting for showing auto-open new instances button in instance watcher
   async function setSmolShowAutoOpenNewInstancesButton(value) {
     const nextValue =
@@ -1159,10 +1169,12 @@ export const useAdvancedSettingsStore = defineStore("AdvancedSettings", () => {
     smolAddedTagPickOrder,
     smolInstancePollSeconds,
     smolKeepWatchingAfterDialogClose,
+    smolSelfInviteWithAutoOpen,
     smolShowAutoOpenNewInstancesButton,
     setSmolAddedTagPickOrder,
     setSmolInstancePollSeconds,
     setSmolKeepWatchingAfterDialogClose,
+    setSmolSelfInviteWithAutoOpen,
     setSmolShowAutoOpenNewInstancesButton,
     setEnablePrimaryPassword,
     setEnablePrimaryPasswordConfigRepository,

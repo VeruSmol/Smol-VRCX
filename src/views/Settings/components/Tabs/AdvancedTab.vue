@@ -37,14 +37,11 @@
           @update:modelValue="setAutoSweepVRChatCache"
         />
       </SettingsItem>
-
-
     </SettingsGroup>
 
     <SettingsGroup
       :title="t('view.settings.advanced.advanced.vrchat_instance_settings.header')"
     >
-    
       <SettingsItem
         :label="t('view.settings.advanced.advanced.self_invite.header')"
         :description="
@@ -54,6 +51,25 @@
         <Switch
           :model-value="selfInviteOverride"
           @update:modelValue="setSelfInviteOverride"
+        />
+      </SettingsItem>
+
+      <!-- [smol] - advanced setting for also self-inviting when watcher auto-opens -->
+      <SettingsItem
+        :label="
+          t(
+            'view.settings.advanced.advanced.smol_self_invite_with_auto_open.header',
+          )
+        "
+        :description="
+          t(
+            'view.settings.advanced.advanced.smol_self_invite_with_auto_open.description',
+          )
+        "
+      >
+        <Switch
+          :model-value="smolSelfInviteWithAutoOpen"
+          @update:modelValue="setSmolSelfInviteWithAutoOpen"
         />
       </SettingsItem>
 
@@ -142,14 +158,14 @@
               <SelectItem value="first_to_last">
                 {{
                   t(
-                    'view.settings.advanced.advanced.smol_auto_open_pick_order.first_to_last',
+                    "view.settings.advanced.advanced.smol_auto_open_pick_order.first_to_last",
                   )
                 }}
               </SelectItem>
               <SelectItem value="last_to_first">
                 {{
                   t(
-                    'view.settings.advanced.advanced.smol_auto_open_pick_order.last_to_first',
+                    "view.settings.advanced.advanced.smol_auto_open_pick_order.last_to_first",
                   )
                 }}
               </SelectItem>
@@ -157,11 +173,7 @@
           </SelectContent>
         </Select>
       </SettingsItem>
-
-
     </SettingsGroup>
-
-
 
     <SettingsGroup :title="t('view.settings.advanced_groups.security.header')">
       <SettingsItem
@@ -352,32 +364,32 @@
       </SettingsItem>
 
       <div class="flex flex-col gap-1 text-sm">
-        <span
-          >{{ t("view.settings.advanced.advanced.cache_debug.user_cache") }}
-          <span v-text="cacheSize.cachedUsers"></span
-        ></span>
-        <span
-          >{{ t("view.settings.advanced.advanced.cache_debug.world_cache") }}
-          <span v-text="cacheSize.cachedWorlds"></span
-        ></span>
-        <span
-          >{{ t("view.settings.advanced.advanced.cache_debug.avatar_cache") }}
-          <span v-text="cacheSize.cachedAvatars"></span
-        ></span>
-        <span
-          >{{ t("view.settings.advanced.advanced.cache_debug.group_cache") }}
-          <span v-text="cacheSize.cachedGroups"></span
-        ></span>
-        <span
-          >{{
+        <span>
+          {{ t("view.settings.advanced.advanced.cache_debug.user_cache") }}
+          <span v-text="cacheSize.cachedUsers" />
+        </span>
+        <span>
+          {{ t("view.settings.advanced.advanced.cache_debug.world_cache") }}
+          <span v-text="cacheSize.cachedWorlds" />
+        </span>
+        <span>
+          {{ t("view.settings.advanced.advanced.cache_debug.avatar_cache") }}
+          <span v-text="cacheSize.cachedAvatars" />
+        </span>
+        <span>
+          {{ t("view.settings.advanced.advanced.cache_debug.group_cache") }}
+          <span v-text="cacheSize.cachedGroups" />
+        </span>
+        <span>
+          {{
             t("view.settings.advanced.advanced.cache_debug.avatar_name_cache")
           }}
-          <span v-text="cacheSize.cachedAvatarNames"></span
-        ></span>
-        <span
-          >{{ t("view.settings.advanced.advanced.cache_debug.instance_cache") }}
-          <span v-text="cacheSize.cachedInstances"></span
-        ></span>
+          <span v-text="cacheSize.cachedAvatarNames" />
+        </span>
+        <span>
+          {{ t("view.settings.advanced.advanced.cache_debug.instance_cache") }}
+          <span v-text="cacheSize.cachedInstances" />
+        </span>
       </div>
 
       <SettingsItem
@@ -399,70 +411,70 @@
       </SettingsItem>
 
       <div class="flex flex-col gap-1 text-sm">
-        <span
-          >{{ t("view.settings.advanced.advanced.sqlite_table_size.gps") }}
-          <span v-text="sqliteTableSizes.gps"></span
-        ></span>
-        <span
-          >{{ t("view.settings.advanced.advanced.sqlite_table_size.status") }}
-          <span v-text="sqliteTableSizes.status"></span
-        ></span>
-        <span
-          >{{ t("view.settings.advanced.advanced.sqlite_table_size.bio") }}
-          <span v-text="sqliteTableSizes.bio"></span
-        ></span>
-        <span
-          >{{ t("view.settings.advanced.advanced.sqlite_table_size.avatar") }}
-          <span v-text="sqliteTableSizes.avatar"></span
-        ></span>
-        <span
-          >{{
+        <span>
+          {{ t("view.settings.advanced.advanced.sqlite_table_size.gps") }}
+          <span v-text="getSqliteTableSizeValue('gps')" />
+        </span>
+        <span>
+          {{ t("view.settings.advanced.advanced.sqlite_table_size.status") }}
+          <span v-text="getSqliteTableSizeValue('status')" />
+        </span>
+        <span>
+          {{ t("view.settings.advanced.advanced.sqlite_table_size.bio") }}
+          <span v-text="getSqliteTableSizeValue('bio')" />
+        </span>
+        <span>
+          {{ t("view.settings.advanced.advanced.sqlite_table_size.avatar") }}
+          <span v-text="getSqliteTableSizeValue('avatar')" />
+        </span>
+        <span>
+          {{
             t(
               "view.settings.advanced.advanced.sqlite_table_size.online_offline",
             )
           }}
-          <span v-text="sqliteTableSizes.onlineOffline"></span
-        ></span>
-        <span
-          >{{
+          <span v-text="getSqliteTableSizeValue('onlineOffline')" />
+        </span>
+        <span>
+          {{
             t(
               "view.settings.advanced.advanced.sqlite_table_size.friend_log_history",
             )
           }}
-          <span v-text="sqliteTableSizes.friendLogHistory"></span
-        ></span>
-        <span
-          >{{
+          <span v-text="getSqliteTableSizeValue('friendLogHistory')" />
+        </span>
+        <span>
+          {{
             t("view.settings.advanced.advanced.sqlite_table_size.notification")
           }}
-          <span v-text="sqliteTableSizes.notification"></span
-        ></span>
-        <span
-          >{{ t("view.settings.advanced.advanced.sqlite_table_size.location") }}
-          <span v-text="sqliteTableSizes.location"></span
-        ></span>
-        <span
-          >{{
+          <span v-text="getSqliteTableSizeValue('notification')" />
+        </span>
+        <span>
+          {{ t("view.settings.advanced.advanced.sqlite_table_size.location") }}
+          <span v-text="getSqliteTableSizeValue('location')" />
+        </span>
+        <span>
+          {{
             t("view.settings.advanced.advanced.sqlite_table_size.join_leave")
           }}
-          <span v-text="sqliteTableSizes.joinLeave"></span
-        ></span>
-        <span
-          >{{
+          <span v-text="getSqliteTableSizeValue('joinLeave')" />
+        </span>
+        <span>
+          {{
             t("view.settings.advanced.advanced.sqlite_table_size.portal_spawn")
           }}
-          <span v-text="sqliteTableSizes.portalSpawn"></span
-        ></span>
-        <span
-          >{{
+          <span v-text="getSqliteTableSizeValue('portalSpawn')" />
+        </span>
+        <span>
+          {{
             t("view.settings.advanced.advanced.sqlite_table_size.video_play")
           }}
-          <span v-text="sqliteTableSizes.videoPlay"></span
-        ></span>
-        <span
-          >{{ t("view.settings.advanced.advanced.sqlite_table_size.event") }}
-          <span v-text="sqliteTableSizes.event"></span
-        ></span>
+          <span v-text="getSqliteTableSizeValue('videoPlay')" />
+        </span>
+        <span>
+          {{ t("view.settings.advanced.advanced.sqlite_table_size.event") }}
+          <span v-text="getSqliteTableSizeValue('event')" />
+        </span>
       </div>
 
       <SettingsItem
@@ -839,6 +851,7 @@ const {
   // [smol] - advanced settings
   smolInstancePollSeconds,
   smolKeepWatchingAfterDialogClose,
+  smolSelfInviteWithAutoOpen,
   smolShowAutoOpenNewInstancesButton,
   smolAddedTagPickOrder,
 } = storeToRefs(advancedSettingsStore);
@@ -860,6 +873,7 @@ const {
   // [smol] - advanced setters
   setSmolInstancePollSeconds,
   setSmolKeepWatchingAfterDialogClose,
+  setSmolSelfInviteWithAutoOpen,
   setSmolShowAutoOpenNewInstancesButton,
   setSmolAddedTagPickOrder,
 } = advancedSettingsStore;
@@ -903,6 +917,11 @@ function updateSmolInstancePollSeconds() {
   nextValue = Math.max(3, Math.min(300, Math.floor(nextValue)));
   smolInstancePollSecondsInput.value = nextValue;
   setSmolInstancePollSeconds(nextValue);
+}
+
+// [smol] - avoid touching sqliteTableSizes store shape just for template typing
+function getSqliteTableSizeValue(key) {
+  return sqliteTableSizes.value?.[key] ?? 0;
 }
 
 function handlePurge() {

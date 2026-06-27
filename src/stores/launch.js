@@ -90,41 +90,73 @@ export const useLaunchStore = defineStore('Launch', () => {
      * @param {string} shortName
      * @returns {Promise<void>}
      */
-    async function tryOpenInstanceInVrc(location, shortName) {
-        if (isOpeningInstance.value) {
-            return;
+
+    async function tryOpenInstanceInVrc(location, shortName, options = {}) {
+    const { selfInviteAnyway = false } = options;
+
+    if (isOpeningInstance.value) {
+        return;
+    }
+
+    isOpeningInstance.value = true;
+
+    let launchUrl = '';
+    let result = false;
+    let effectiveShortName = shortName || '';
+
+    try {
+        launchUrl = await getLaunchUrl(location, shortName);
+
+        const shortNameMatch = launchUrl.match(/[?&]shortName=([^&]+)/);
+        if (!effectiveShortName && shortNameMatch?.[1]) {
+            effectiveShortName = decodeURIComponent(shortNameMatch[1]);
         }
-        isOpeningInstance.value = true;
-        let launchUrl = '';
-        let result = false;
-        try {
-            launchUrl = await getLaunchUrl(location, shortName);
-            result = await AppApi.TryOpenInstanceInVrc(launchUrl);
-        } catch (e) {
-            console.error(e);
+
+        if (
+            !launchUrl.includes('&launch=') &&
+            !launchUrl.includes('?launch=')
+        ) {
+            launchUrl += '&launch=1';
         }
-        console.log('Attach Game', launchUrl, result);
+
+        result = await AppApi.TryOpenInstanceInVrc(launchUrl);
+    } catch (e) {
+        console.error(e);
+    }
+
+    console.log('[TryOpenInstanceInVrc]', {
+        location,
+        shortName,
+        effectiveShortName,
+        launchUrl,
+        pipeAccepted: result,
+        selfInviteAnyway
+    });
+
+    if (!result || selfInviteAnyway) {
         if (!result) {
             toast.warning(
                 'Failed open instance in VRChat, falling back to self invite'
             );
-            // self invite fallback
-            try {
-                const L = parseLocation(location);
-                await instanceRequest.selfInvite({
-                    instanceId: L.instanceId,
-                    worldId: L.worldId,
-                    shortName
-                });
-                toast.success(t('message.invite.self_sent'));
-            } catch (e) {
-                console.error(e);
-            }
         }
-        setTimeout(() => {
-            isOpeningInstance.value = false;
-        }, 1000);
+
+        try {
+            const L = parseLocation(location);
+            await instanceRequest.selfInvite({
+                instanceId: L.instanceId,
+                worldId: L.worldId,
+                shortName: effectiveShortName
+            });
+            toast.success(t('message.invite.self_sent'));
+        } catch (e) {
+            console.error(e);
+        }
     }
+
+    setTimeout(() => {
+        isOpeningInstance.value = false;
+    }, 1000);
+}
 
     /**
      *

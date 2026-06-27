@@ -56,6 +56,10 @@ let smolWatchedGroupName =
 let smolKeepWatchingAfterDialogClose =
   localStorage.getItem("smol-keep-watching-after-dialog-close") === "true";
 
+// [smol] - advanced setting: also self-invite when auto-opening
+let smolSelfInviteWithAutoOpen =
+  localStorage.getItem("smol-self-invite-with-auto-open") === "true";
+  
 // [smol] - auto-open duration / countdown state
 let smolAutoOpenDurationSeconds = Math.max(
   10,
@@ -362,6 +366,20 @@ export function setSmolKeepWatchingAfterDialogClose(enabled) {
     String(smolKeepWatchingAfterDialogClose),
   );
   return smolKeepWatchingAfterDialogClose;
+}
+
+// [smol] - self-invite backup setting
+export function getSmolSelfInviteWithAutoOpen() {
+  return smolSelfInviteWithAutoOpen;
+}
+
+export function setSmolSelfInviteWithAutoOpen(enabled) {
+  smolSelfInviteWithAutoOpen = Boolean(enabled);
+  localStorage.setItem(
+    "smol-self-invite-with-auto-open",
+    String(smolSelfInviteWithAutoOpen),
+  );
+  return smolSelfInviteWithAutoOpen;
 }
 
 // [smol] - expose active watched group info for UI
@@ -675,7 +693,7 @@ export function startSmolInstancePolling(groupId, existingRef) {
   }, smolInstancePollSeconds * 1000);
 }
 
-// [smol] - detect newly seen instances, log more room details, and choose using the configured tag pick order
+// [smol] - detect newly seen instances, log room details, and choose using the configured tag pick order
 export function handleSmolObservedInstances(instances, source = "api") {
   const groupStore = useGroupStore();
   const launchStore = useLaunchStore();
@@ -835,11 +853,14 @@ export function handleSmolObservedInstances(instances, source = "api") {
   console.log("[Smol][AUTO] about to call tryOpenInstanceInVrc:", {
     newLocation,
     shortName,
+    selfInviteWithAutoOpen: smolSelfInviteWithAutoOpen,
     fnType: typeof launchStore?.tryOpenInstanceInVrc,
   });
 
   try {
-    launchStore.tryOpenInstanceInVrc(newLocation, shortName);
+    launchStore.tryOpenInstanceInVrc(newLocation, shortName, {
+      selfInviteAnyway: smolSelfInviteWithAutoOpen,
+    });
     smolLastWatchedLocation = newLocation;
     resetSmolWatcherState("Auto-open succeeded");
 

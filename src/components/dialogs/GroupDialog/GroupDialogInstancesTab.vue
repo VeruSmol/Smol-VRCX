@@ -20,9 +20,10 @@
         </span>
       </div>
 
-      <div 
-       v-if="smolShowAutoOpenNewInstancesButton"
-        class="flex flex-wrap items-center gap-2 mt-3">
+      <div
+        v-if="smolShowAutoOpenNewInstancesButton"
+        class="flex flex-wrap items-center gap-2 mt-3"
+      >
         <TooltipWrapper side="top" :content="getSmolWatcherTooltip()">
           <Button
             size="sm"
@@ -133,7 +134,13 @@
         >
           <div
             class="relative inline-block flex-none size-9 mr-2.5"
-            :class="userStatusClass(user)"
+            :class="
+            userStatusClass(
+              user.status,
+              user.$trustLevel ?? user.trustLevel,
+              user.$isPendingOffline ?? false,
+            )
+          "
           >
             <Avatar class="size-9">
               <AvatarImage :src="userImage(user)" class="object-cover" />
@@ -252,6 +259,7 @@ function syncSmolDurationUiFromSeconds(seconds) {
     smolAutoOpenDurationMinutes.value = minutes;
   }
 }
+
 
 // [smol] - button text depending on state and group membership status
 function getSmolWatcherButtonLabel() {
@@ -408,7 +416,7 @@ watch(
       smolInstancePollSeconds.value = getSmolInstancePollSeconds();
       smolAutoOpenDurationSeconds.value = getSmolAutoOpenDurationSeconds();
       smolAutoOpenRemainingSeconds.value = getSmolAutoOpenRemainingSeconds();
-      smolKeepWatchingAfterDialogClose.value =
+        smolKeepWatchingAfterDialogClose.value =
         getSmolKeepWatchingAfterDialogClose();
       smolWatchedGroupId.value = getSmolWatchedGroupId();
       smolWatchedGroupName.value = getSmolWatchedGroupName();
