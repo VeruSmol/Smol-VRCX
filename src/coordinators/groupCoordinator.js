@@ -47,6 +47,9 @@ let smolLastWatchedTags = [];
 let smolLastWatchedLocation = null;
 let smolWatchedGroupIsMember = false;
 
+// [smol] - each time watcher turns on, give it a number, this number, counts up each time its stopped
+let smolWatcherSessionId = 0;
+
 // [smol] - remember which group is actively being watched
 let smolWatchedGroupId = localStorage.getItem("smol-watched-group-id") || "";
 let smolWatchedGroupName =
@@ -59,7 +62,7 @@ let smolKeepWatchingAfterDialogClose =
 // [smol] - advanced setting: also self-invite when auto-opening
 let smolSelfInviteWithAutoOpen =
   localStorage.getItem("smol-self-invite-with-auto-open") === "true";
-  
+
 // [smol] - auto-open duration / countdown state
 let smolAutoOpenDurationSeconds = Math.max(
   10,
@@ -160,6 +163,32 @@ function getSmolRoomSummary(room, index, previousIndex = null) {
 // [smol] - websocket rooms by group
 const smolWebsocketRoomsByGroupId = new Map();
 
+// [smol] - websocket/friend-location rooms are useful for detection/display,
+// but they must never become the baseline used to decide what is already old.
+function isSmolWebsocketRoom(room) {
+  return Boolean(
+    room?.$smolWebsocketRoom ||
+      room?.ref?.source === "websocket" ||
+      room?.ref?.source === "friend-location",
+  );
+}
+
+// [smol] - baseline must only come from real visible/API rooms, never websocket cache.
+function getSmolBaselineInstances(instances) {
+  return Array.isArray(instances)
+    ? instances.filter((room) => !isSmolWebsocketRoom(room))
+    : [];
+}
+
+function isSmolCurrentWatcherSession(sessionId, groupId = smolWatchedGroupId) {
+  return (
+    smolWatchNewInstances &&
+    sessionId === smolWatcherSessionId &&
+    Boolean(smolWatchedGroupId) &&
+    (!groupId || groupId === smolWatchedGroupId)
+  );
+}
+
 // [smol] - get group id from location
 function getSmolGroupIdFromLocation(location) {
   if (typeof location !== "string") {
@@ -237,6 +266,8 @@ export function addSmolWebsocketInstanceLocation(location, source = "websocket")
     tag: location,
     location,
     $location: L,
+    $smolWebsocketRoom: true,
+    $smolWebsocketSource: source,
     friendCount: 1,
     users: [],
     shortName: L?.shortName || "",
@@ -283,21 +314,20 @@ export function addSmolWebsocketInstanceLocation(location, source = "websocket")
     return;
   }
 
+  // [smol] - websocket rooms must never seed baseline.
+  // If this websocket location belongs to the watched group, treat it as a candidate.
+  const watcherSessionId = smolWatcherSessionId;
   const observedInstances = getSmolMergedInstances([], smolWatchedGroupId);
-
-  // [smol] - if this is the first list, save it but don't open
-  if (smolLastWatchedTags.length === 0) {
-    seedSmolObservedInstances(observedInstances);
-    console.log("[Smol][AUTO] websocket baseline saved");
-    return;
-  }
 
   console.log("[Smol][AUTO] websocket interrupt:", {
     groupId,
     location,
+    alreadyHadRoom,
+    baselineHasRoom: smolLastWatchedTags.includes(location),
+    watcherSessionId,
   });
 
-  handleSmolObservedInstances(observedInstances, "websocket");
+  void handleSmolObservedInstances(observedInstances, "websocket", watcherSessionId);
 }
 
 // [smol] - save websocket locations
@@ -425,15 +455,23 @@ export function getSmolInstancePollSecondsLabel(value) {
   return "seconds.";
 }
 
-// [smol] - seed current instances as baseline so existing instances are not treated as newly opened
+// [smol] - seed current real/API instances as baseline so existing instances are not treated as newly opened
 export function seedSmolObservedInstances(instances) {
-  const tags = Array.isArray(instances)
-    ? instances.map((room) => getSmolRoomLocation(room)).filter(Boolean)
-    : [];
+  const baselineInstances = getSmolBaselineInstances(instances);
+  const tags = baselineInstances
+    .map((room) => getSmolRoomLocation(room))
+    .filter(Boolean);
+
+  const ignoredWebsocketCount = Array.isArray(instances)
+    ? instances.length - baselineInstances.length
+    : 0;
 
   // [smol] - don't let empty refreshes overwrite a real baseline
   if (tags.length === 0 && smolLastWatchedTags.length > 0) {
-    console.log("[Smol][AUTO] seed skipped: empty list");
+    console.log("[Smol][AUTO] seed skipped: empty real/API baseline", {
+      ignoredWebsocketCount,
+      existingBaselineCount: smolLastWatchedTags.length,
+    });
     return;
   }
 
@@ -442,6 +480,7 @@ export function seedSmolObservedInstances(instances) {
   console.log("[Smol][AUTO] baseline saved:", {
     instanceCount: smolLastWatchedTags.length,
     tags: smolLastWatchedTags,
+    ignoredWebsocketCount,
   });
 }
 
@@ -460,6 +499,9 @@ export function resetSmolWatcherState(reason = "Smol watcher state reset") {
 
 // [smol] - stop polling loop
 export function stopSmolInstancePolling(reason = "") {
+  // [smol] - invalidate any in-flight API/launch promises from the previous session
+  smolWatcherSessionId += 1;
+
   if (smolInstancePollTimerId) {
     workerTimers.clearInterval(smolInstancePollTimerId);
     smolInstancePollTimerId = null;
@@ -510,12 +552,15 @@ export function startSmolInstancePolling(groupId, existingRef) {
   localStorage.setItem("smol-watched-group-id", smolWatchedGroupId);
   localStorage.setItem("smol-watched-group-name", smolWatchedGroupName);
 
-  // [smol] - seed visible and websocket rooms first
+  // [smol] - this is the only active watcher session from here on.
+  const watcherSessionId = smolWatcherSessionId;
+
+  // [smol] - old websocket/friend-location cache must not poison a new watch session.
+  smolWebsocketRoomsByGroupId.delete(smolWatchedGroupId);
+
+  // [smol] - seed visible rooms only; never include websocket cache in baseline.
   seedSmolObservedInstances(
-    getSmolMergedInstances(
-      groupStore.groupDialog.instances,
-      smolWatchedGroupId,
-    ),
+    getSmolBaselineInstances(groupStore.groupDialog.instances),
   );
 
   console.log("[Smol][AUTO] baseline seeded from visible dialog:", {
@@ -529,6 +574,14 @@ export function startSmolInstancePolling(groupId, existingRef) {
       groupId: smolWatchedGroupId,
     })
     .then((args) => {
+      if (!isSmolCurrentWatcherSession(watcherSessionId, smolWatchedGroupId)) {
+        console.log("[Smol][AUTO] baseline seed ignored: stale session", {
+          watcherSessionId,
+          currentSessionId: smolWatcherSessionId,
+        });
+        return;
+      }
+
       const instances = Array.isArray(args?.json?.instances)
         ? args.json.instances
         : [];
@@ -548,11 +601,13 @@ export function startSmolInstancePolling(groupId, existingRef) {
         return;
       }
 
-      seedSmolObservedInstances(observedInstances);
+      // [smol] - baseline comes from API rooms only, not merged websocket rooms.
+      seedSmolObservedInstances(instances);
 
       console.log("[Smol][AUTO] baseline seeded from API:", {
         watchedGroupId: smolWatchedGroupId,
-        instanceCount: observedInstances.length,
+        apiInstanceCount: instances.length,
+        observedInstanceCount: observedInstances.length,
       });
 
       if (
@@ -582,6 +637,14 @@ export function startSmolInstancePolling(groupId, existingRef) {
   smolInstancePollTimerId = workerTimers.setInterval(async () => {
     const dialogVisible = groupStore.groupDialog.visible;
     const currentDialogGroupId = groupStore.groupDialog.id;
+
+    if (!isSmolCurrentWatcherSession(watcherSessionId, smolWatchedGroupId)) {
+      console.log("[Smol][AUTO] poll ignored: stale watcher session", {
+        watcherSessionId,
+        currentSessionId: smolWatcherSessionId,
+      });
+      return;
+    }
 
     // [smol] - stop only if toggle disabled
     if (!smolWatchNewInstances) {
@@ -615,6 +678,14 @@ export function startSmolInstancePolling(groupId, existingRef) {
       const args = await groupRequest.getGroupInstances({
         groupId: smolWatchedGroupId,
       });
+
+      if (!isSmolCurrentWatcherSession(watcherSessionId, smolWatchedGroupId)) {
+        console.log("[Smol][AUTO] poll result ignored: stale watcher session", {
+          watcherSessionId,
+          currentSessionId: smolWatcherSessionId,
+        });
+        return;
+      }
 
       const instances = Array.isArray(args?.json?.instances)
         ? args.json.instances
@@ -670,7 +741,7 @@ export function startSmolInstancePolling(groupId, existingRef) {
         }
       }
 
-      handleSmolObservedInstances(observedInstances, "api");
+      await handleSmolObservedInstances(observedInstances, "api", watcherSessionId);
     } catch (err) {
       // [smol] - logic to stop if request.js throws a 429 error (tysm)
       if (err?.status === 429) {
@@ -694,9 +765,22 @@ export function startSmolInstancePolling(groupId, existingRef) {
 }
 
 // [smol] - detect newly seen instances, log room details, and choose using the configured tag pick order
-export function handleSmolObservedInstances(instances, source = "api") {
+export async function handleSmolObservedInstances(
+  instances,
+  source = "api",
+  watcherSessionId = smolWatcherSessionId,
+) {
   const groupStore = useGroupStore();
   const launchStore = useLaunchStore();
+
+  if (!isSmolCurrentWatcherSession(watcherSessionId, smolWatchedGroupId)) {
+    console.log("[Smol][AUTO] handle ignored: stale watcher session", {
+      source,
+      watcherSessionId,
+      currentSessionId: smolWatcherSessionId,
+    });
+    return [];
+  }
 
   const safeInstances = Array.isArray(instances) ? instances : [];
   const currentTags = safeInstances
@@ -774,7 +858,7 @@ export function handleSmolObservedInstances(instances, source = "api") {
   // [smol] - keep baseline updated even when watcher is off
   if (!smolWatchNewInstances) {
     console.log("[Smol][AUTO] abort: watcher disabled");
-    smolLastWatchedTags = [...currentTags];
+    seedSmolObservedInstances(safeInstances);
     return addedTags;
   }
 
@@ -786,13 +870,13 @@ export function handleSmolObservedInstances(instances, source = "api") {
     groupStore.groupDialog.id !== smolWatchedGroupId
   ) {
     console.log("[Smol][AUTO] abort: different group dialog is open");
-    smolLastWatchedTags = [...currentTags];
+    seedSmolObservedInstances(safeInstances);
     return addedTags;
   }
 
   if (addedTags.length === 0) {
     console.log("[Smol][AUTO] abort: no added tags");
-    smolLastWatchedTags = [...currentTags];
+    seedSmolObservedInstances(safeInstances);
     return addedTags;
   }
 
@@ -813,7 +897,7 @@ export function handleSmolObservedInstances(instances, source = "api") {
 
   if (!newLocation) {
     console.log("[Smol][AUTO] abort: no unopened new location");
-    smolLastWatchedTags = [...currentTags];
+    seedSmolObservedInstances(safeInstances);
     return addedTags;
   }
 
@@ -840,7 +924,7 @@ export function handleSmolObservedInstances(instances, source = "api") {
 
   if (!newRoom) {
     console.log("[Smol][AUTO] abort: no matching room for tag");
-    smolLastWatchedTags = [...currentTags];
+    seedSmolObservedInstances(safeInstances);
     return addedTags;
   }
 
@@ -858,23 +942,43 @@ export function handleSmolObservedInstances(instances, source = "api") {
   });
 
   try {
-    launchStore.tryOpenInstanceInVrc(newLocation, shortName, {
-      selfInviteAnyway: smolSelfInviteWithAutoOpen,
-    });
+    const launchResult = await launchStore.tryOpenInstanceInVrc(
+      newLocation,
+      shortName,
+      {
+        selfInviteAnyway: smolSelfInviteWithAutoOpen,
+      },
+    );
+
+    if (!isSmolCurrentWatcherSession(watcherSessionId, smolWatchedGroupId)) {
+      console.log("[Smol][AUTO] launch result ignored: stale watcher session", {
+        newLocation,
+        watcherSessionId,
+        currentSessionId: smolWatcherSessionId,
+        launchResult,
+      });
+      return addedTags;
+    }
+
     smolLastWatchedLocation = newLocation;
-    resetSmolWatcherState("Auto-open succeeded");
 
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
 
-    console.log("[Smol][AUTO] launch call completed:", newLocation);
+    console.log("[Smol][AUTO] launch call completed:", {
+      newLocation,
+      launchResult,
+    });
+
+    resetSmolWatcherState("Auto-open succeeded");
+    return addedTags;
   } catch (err) {
     console.error("[Smol][AUTO] launch threw error:", err);
-  }
 
-  smolLastWatchedTags = [...currentTags];
-  return addedTags;
+    // [smol] - do not baseline the failed new location; keep watching so the next poll can retry.
+    return addedTags;
+  }
 }
 /**
  * @param ref
@@ -1297,11 +1401,13 @@ export function getGroupDialogGroup(groupId, existingRef) {
               },
             );
           } else if (!smolWatchNewInstances) {
-            seedSmolObservedInstances(observedInstances);
+            // [smol] - group page baseline comes from API rooms only, NOT WEBSOCKETS NOT NOT NOT 
+            seedSmolObservedInstances(instances);
 
             console.log("[Smol][AUTO] baseline seeded from group page:", {
               groupId,
-              instanceCount: observedInstances.length,
+              apiInstanceCount: instances.length,
+              observedInstanceCount: observedInstances.length,
             });
           } else if (groupId === smolWatchedGroupId) {
             console.log("[Smol][AUTO] group page baseline skipped while watching:", {

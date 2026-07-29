@@ -1066,7 +1066,7 @@
                     },
                     "self_invite": {
                         "header": "Disable Instance Opening in VRChat",
-                        "description": "Always Self Invite Instead of Opening Instances directly in VRChat (not recommended)"
+                        "description": "Always Self Invite Instead of Opening Instances directly in VRChat (not recommended)."
                     },
                     "smol_self_invite_with_auto_open": {
                         "header": "Also Self Invite When Auto-Opening",
